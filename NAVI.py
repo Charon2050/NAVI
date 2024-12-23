@@ -29,7 +29,7 @@ default_config = {
     'max_try_times': 5,
     'tts_volume': 80,
     'skip_auth': False,
-    'simple_shell_output': False,
+    'simple_shell_output': True,
     'hide_shell_output': False,
     'example_mode': False,
     'quiet_mode': False,
@@ -92,7 +92,7 @@ def read_config(var):
             # 如果能正确解析为字典
             if isinstance(ast.literal_eval(config),dict):
                 config = ast.literal_eval(config)
-                if config.get(var):
+                if config.get(var) is not None:
                     return config[var]         # 字典里有的键，返回对应的值
                 else:
                     return default_config[var] # 字典里没有的键，返回默认值
@@ -103,7 +103,7 @@ def read_config(var):
         return default_config[var]     # 返回默认值
 
 
-# 识别代码块的语言
+# 识别代码块的语言，键全小写
 shell_mode={
     "navi_shell":"NAVI_Shell",
     "powershell":"PowerShell",
@@ -692,44 +692,45 @@ if __name__ == 'main' or True:
             api_key=sys.argv[i+1]
             sys.argv.pop(i)
             sys.argv.pop(i)
-            write_log('-api_key: '+api_key[:4]+'*'*(len(api_key)-8)+api_key[-4:])
+            write_log('api_key set to: '+api_key[:4]+'*'*(len(api_key)-8)+api_key[-4:])
             continue
         if sys.argv[i].lower() in ["-s","-skip"]:
             api_key_verified = True
             sys.argv.pop(i)
-            write_log('-skip: enabled')
+            write_log('api_key_verified set to: True')
             continue
         if sys.argv[i].lower() in ["-url","-baseurl","-base-url","-base_url"]:
             base_url=sys.argv[i+1]
             sys.argv.pop(i)
             sys.argv.pop(i)
-            write_log('base_url switch to: ' + base_url)
+            write_log('base_url set to: ' + base_url)
             continue
         if sys.argv[i].lower() in ["-m","-model"]:
             model=sys.argv[i+1]
             sys.argv.pop(i)
             sys.argv.pop(i)
-            write_log('model switch to: ' + model)
+            write_log('model set to: ' + model)
             continue
         if sys.argv[i].lower() in ["-noshell","-hideshell","-onlychat"]:
-            hide_shell_output=True
+            # hide_shell_output 和 simple_shell_output 均开启时，hide_shell_output 优先生效
+            hide_shell_output = True
             sys.argv.pop(i)
-            write_log('-noshell: enabled')
+            write_log('hide_shell_output set to: True')
             continue
         if sys.argv[i].lower() in ["-simpleshell","-spsh","-lessshell","-lssh"]:
-            simple_shell_output=True
+            simple_shell_output = True
             sys.argv.pop(i)
-            write_log('-lessshell: enabled')
+            write_log('simple_shell_output set to: True')
             continue
         if sys.argv[i].lower() in ["-example","-eg"]:
             example_mode=True
             sys.argv.pop(i)
-            write_log('-example: enabled')
+            write_log('example_mode set to: True')
             continue
         if sys.argv[i].lower() in ["-quiet","-q",'-slience']:
             quiet_mode=True
             sys.argv.pop(i)
-            write_log('-quiet: enabled')
+            write_log('quiet_mode set to: True')
             continue
         i = i + 1
     
