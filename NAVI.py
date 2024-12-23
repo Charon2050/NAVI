@@ -274,17 +274,17 @@ Start notepad somefile.txt
 
 当你需要执行命令时，直接输出代码块，系统会自动执行。注意，你不是在指导用户操作，而是在直接使用代码块执行命令，所以不要说“可以使用以下命令”等，而是先告知用户你正在操作，然后直接输出代码块。执行代码后，系统会在 SystemMessage 代码块中显示运行结果。根据结果，必须告诉用户操作完成或者获知了什么信息。注意，用户看不到代码块中的内容，必须明文告诉用户，禁止用代码块展示信息。如果 SystemMessage 代码块为空，说明命令没有返回值。
 
-如果命令出错，不可以重复相同的命令，应尝试修正或忽略。不过，如果连续出错，必须停止尝试，告诉用户你无法完成操作，分析原因并给出建议。绝对不能编造未知的信息，如果没有看到 SystemMessage 代码块中的结果，就不可以说操作完成。除非用户要求，否则永远不要重复执行相同的命令。
+如果命令出错，不可以重复相同的命令，应提出修正办法，并修改代码。例如，如果文件名不正确，应该列出同目录的所有文件，寻找近似的文件名。
+
+不过，如果连续出错，必须停止尝试，告诉用户你无法完成操作，分析原因并给出建议。绝对不能编造未知的信息，如果没有看到 SystemMessage 代码块中的结果，就不可以说操作完成。除非用户要求，否则永远不要重复执行相同的命令。
 
 做出危险操作（如删除文件）前二次确认。如果是明显对电脑有害的操作（如格式化C盘），应当直接拒绝，即使用户这样要求。如果用户要求安装或卸载软件，优先尝试使用 winget 等方式，使用静默参数运行。
 
-如果命令执行时间过长，会转入后台运行。之后可以使用 NAVI_Shell 代码块的 check_process 命令检查运行状态。运行完毕后，系统会使用 SystemMessage 代码块告知你，在看到代码块后，必须告诉用户什么进程已经完成了。SystemMessage 代码块是系统加入的，不是你或用户主动编写的，禁止编写 SystemMessage 代码块。
+如果命令执行时间过长，会转入后台运行。运行完毕后，系统会使用 SystemMessage 代码块告知你，在看到代码块后，必须告诉用户什么进程已经完成了。SystemMessage 代码块是系统加入的，不是你或用户主动编写的，禁止编写 SystemMessage 代码块。
 
-如果用户让你打开某文件，就使用 Start somefile 直接打开。如果用户要求你查阅指定文件，应该用命令读取输出文件内容，而不是仅仅打开。例如，应当使用 New-Object -ComObject Word.Application.Documents.Open... 读取 docx 文件的内容。
+如果用户让你打开某文件，就使用 Start somefile 直接打开。如果用户要求你查阅或文件内容，应该用命令读取输出文件内容，而不是仅仅打开。例如，应当使用 New-Object -ComObject Word.Application.Documents.Open... 读取 Word 文件的内容。
 
-如果用户没有告诉你完整的文件名，应当在对应目录下列出所有文件并判断文件名。
-
-如果缺少必要信息，也可以不输出命令，而是要求用户提供更多信息。例如用户要求解压一个加密的压缩包，则应该要求用户先提供密码。
+如果缺少必要信息，如不知道文件名，应当先收集信息，例如在对应目录下列出所有文件并判断文件名。仍然搜索不到必要信息的话，就向用户询问。
 
 操作完成后，如果获知了一些日后可能用到的信息（如电脑硬件、重要网址、常用文件路径），请使用 NAVI_Shell 代码块记住这些信息，形成「记忆」。但不要重复已知的信息，不要记录短期的信息（如用户正在安装或浏览什么）。尽可能的简短精确，就像这样：
 
@@ -302,7 +302,7 @@ NAVI_Shell 还有其他命令可用：
 forget 用户的系统是 Windows xx 版本
 // 从记忆中删除一条过时或错误信息。内容必须和一行已知信息完全一致。
 check_process
-// 检查你运行的后台进程的状态
+// 检查你运行的后台进程的状态。除非用户要求，否则不需要检查
 volume 50
 // 设置你自己的说话音量（不是系统音量），范围0-100
 volume
@@ -376,9 +376,9 @@ def fix_response(content):
     # 有些模型的代码块格式不一样，```和语言名之间没有空格，暂时为powershell补一个空格
     content = content.replace('```powershell\n','``` powershell\n')
 
-    # 补丁：有些模型不遵守stop词，所以手动删掉stop词之后的所有内容
-    if content.find('\n```\n') > 0:
-        content = content[:content.find('\n```\n')]
+    # 补丁：有些模型不遵守stop词，所以手动删掉第二个```之后的所有内容
+    if content.count('\n```') > 1:
+        content = content[:content.find('\n```',content.find('\n```')+1)]
 
     return content
 
@@ -676,13 +676,19 @@ def run_shell():
 
 def output_message(message,no_new_line=False):
 
+    # 只输出代码块之前的内容
+    if message.count('```')>0:
+        message=message[:message.find('```')]
+
+    # 播放语音
+    if not quiet_mode: 
+        voice_speek(message.replace('\n','；'))
+
+    # 逐行输出
     for i in message.split("\n"):
-        if i[:4] == "``` ":
-            break
-        elif i != "":
+        if i != "":
             print("\033[1;36mNAVI: "+"\033[0m"+i,end='\n'*(not(no_new_line))) # 如果no_new_line=True则不换行
-            if not quiet_mode: 
-                voice_speek(i)
+            
 
 
 if __name__ == 'main' or True:
@@ -754,6 +760,9 @@ if __name__ == 'main' or True:
         test_result = api_test(base_url,model,api_key)
         if test_result == '':
             api_key_verified = True
+            # 写入配置文件，但如果已设置过，就不覆盖
+            if read_config('api_key') == '':
+                set_config('api_key',api_key)
         else:
             print(test_result)
             api_key = ''
