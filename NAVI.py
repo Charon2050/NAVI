@@ -280,7 +280,7 @@ Start notepad somefile.txt
 
 如果命令执行时间过长，会转入后台运行。之后可以使用 NAVI_Shell 代码块的 check_process 命令检查运行状态。运行完毕后，系统会使用 SystemMessage 代码块告知你，在看到代码块后，必须告诉用户什么进程已经完成了。SystemMessage 代码块是系统加入的，不是你或用户主动编写的，禁止编写 SystemMessage 代码块。
 
-当用户要求你查阅指定文件时，应该用命令读取输出文件内容，而不是仅仅打开。例如，应当使用 New-Object -ComObject Word.Application.Documents.Open... 读取 docx 文件的内容。
+如果用户让你打开某文件，就使用 Start somefile 直接打开。如果用户要求你查阅指定文件，应该用命令读取输出文件内容，而不是仅仅打开。例如，应当使用 New-Object -ComObject Word.Application.Documents.Open... 读取 docx 文件的内容。
 
 如果用户没有告诉你完整的文件名，应当在对应目录下列出所有文件并判断文件名。
 
