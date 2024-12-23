@@ -197,7 +197,11 @@ def check_completed_processes():
             # 发现完成的进程时
             if running_processes[i][0].poll() is not None :
                 # 添加一行提示消息（暂不带代码块）
-                completed_processes.append("Info: A background program (started at " + running_processes[i][1] + ") just finished, with following result:\n" + "".join(running_processes[i][0].communicate()))
+                try:
+                    result = "".join(running_processes[i][0].communicate())
+                except:
+                    result = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
+                completed_processes.append("Info: A background program (started at " + running_processes[i][1] + ") just finished, with following result:\n" + result)
                 running_processes.pop(i)
                 continue
             i = i + 1        
@@ -275,6 +279,8 @@ Start notepad somefile.txt
 做出危险操作（如删除文件）前二次确认。如果是明显对电脑有害的操作（如格式化C盘），应当直接拒绝，即使用户这样要求。如果用户要求安装或卸载软件，优先尝试使用 winget 等方式，使用静默参数运行。
 
 如果命令执行时间过长，会转入后台运行。之后可以使用 NAVI_Shell 代码块的 check_process 命令检查运行状态。运行完毕后，系统会使用 SystemMessage 代码块告知你，在看到代码块后，必须告诉用户什么进程已经完成了。SystemMessage 代码块是系统加入的，不是你或用户主动编写的，禁止编写 SystemMessage 代码块。
+
+当用户要求你查阅指定文件时，应该用命令读取输出文件内容，而不是仅仅打开。例如，应当使用 New-Object -ComObject Word.Application.Documents.Open... 读取 docx 文件的内容。
 
 如果用户没有告诉你完整的文件名，应当在对应目录下列出所有文件并判断文件名。
 
@@ -431,7 +437,7 @@ def navi_shell(shell):
         for i in running_processes:
             # 不管状态，全部都告诉AI仍在运行。因为运行完成后 check_completed_processes() 会自动汇报，如果这里也汇报，AI 就会收到两条完成消息，导致编造其中一条的结果
             temp.append('INFO: A process started at ' + i[1] + ' is still running.')
-        return "\n".join(temp)+'\nINFO: No other process running.'
+        return "\n".join(temp)+'\nINFO: No other process running. Do not repeatedly run this command.'
     
     elif shell[:6]=="volume":
         if shell=="volume":
@@ -564,7 +570,10 @@ def run_shell():
         for i in range(10):
             time.sleep(0.4)
             if running_processes[-1][0].poll() is not None:
-                result = "".join(running_processes[-1][0].communicate())
+                try:
+                    result = "".join(running_processes[-1][0].communicate())
+                except:
+                    result = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding."
                 running_processes.pop()
                 break
 
@@ -578,7 +587,10 @@ def run_shell():
         for i in range(10):
             time.sleep(0.4)
             if running_processes[-1][0].poll() is not None:
-                result = "".join(running_processes[-1][0].communicate())
+                try:
+                    result = "".join(running_processes[-1][0].communicate())
+                except:
+                    result = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding."
                 running_processes.pop()
                 break
             
