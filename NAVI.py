@@ -1,4 +1,5 @@
-import sys, os
+import sys, os, _winapi
+import msvcrt
 import time, re, ast
 import csv
 import subprocess
@@ -122,7 +123,7 @@ shell_mode={
     "system message":"SystemMessage"
 }
 
-# 已测试: DeepSeek, 阿里通义(推荐), 讯飞星火(不推荐), 智谱GLM(不推荐)
+# 已测试: DeepSeek, 阿里通义(推荐), 智谱GLM, 讯飞星火(不推荐)
 # 理论可支持任何兼容 OpenAI 格式调用的模型。但推荐使用代码能力较强的模型，不推荐使用免费模型。
 base_url = read_config('base_url')
 model = read_config('model')
@@ -148,7 +149,7 @@ tts_volume = read_config('tts_volume')
 # 这个 messages 就是历史记录，注意是不包括 system prompt 的
 messages = []
 
-# 用于储存后台进程的二维列表，每个元素都是一个有2个元素的列表，running_processes[x][0]为后台进程，running_processes[x][1]为此进程开始的时间
+# 用于储存后台进程的二维列表，每个元素都是一个有3个元素的列表，running_processes[x][0]为后台进程，running_processes[x][1]为此进程开始的时间，running_processes[x][2]为输出和错误
 running_processes = []
 
 # 等待用户输入时开启，用户输入后关闭，供check_completed_processes()判断自己是否仍需运行
@@ -189,23 +190,46 @@ def api_test(base_url, model, api_key):
 
 # 循环检测是否有完成的后台进程
 def check_completed_processes():
+
     # 只在等待用户输入时检测
     while waiting_input:
         completed_processes=[]
         i=0
+
+        #遍历全部后台进程
         while i < len(running_processes):
-            # 发现完成的进程时
-            if running_processes[i][0].poll() is not None :
+
+            # 此处参考 https://blog.csdn.net/KiteRunner/article/details/129848482
+            # 若进程仍在运行
+            if running_processes[i][0].poll() is None:
+                # 获取handle
+                handle = msvcrt.get_osfhandle(running_processes[i][0].stdout.fileno())
+                # 若有输出
+                if _winapi.PeekNamedPipe(handle, 0)[0] > 0:
+                    # 读取输出
+                    data= _winapi.ReadFile(handle, _winapi.PeekNamedPipe(handle, 0)[0])[0]
+                    try:
+                        # 尝试解码
+                        running_processes[i][2] = running_processes[i][2] + data.decode('GBK') # 输出是自带换行的
+                    except UnicodeDecodeError:
+                        # 否则报错
+                        running_processes[i][2] = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
+                        # 已经编码错误了就别试了
+                        running_processes[i][0].kill()
+
+            # 若进程已结束
+            else:
                 # 添加一行提示消息（暂不带代码块）
                 try:
-                    result = "".join(running_processes[i][0].communicate())
+                    result = running_processes[i][2] + "".join(running_processes[i][0].communicate())
                 except:
                     result = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
                 completed_processes.append("Info: A background program (started at " + running_processes[i][1] + ") just finished, with following result:\n" + result)
                 running_processes.pop(i)
                 continue
-            i = i + 1        
-        # 如果发现了至少1个完成的进程
+            i = i + 1 
+
+        # 遍历后，如果发现了至少1个完成的进程
         if completed_processes:
             write_log('\n'.join(completed_processes))
             # 输出消息之前，先换一行，防止和 'USER: ' 输入提示放在同一行
@@ -436,7 +460,12 @@ def navi_shell(shell):
         temp = []
         for i in running_processes:
             # 不管状态，全部都告诉AI仍在运行。因为运行完成后 check_completed_processes() 会自动汇报，如果这里也汇报，AI 就会收到两条完成消息，导致编造其中一条的结果
-            temp.append('INFO: A process started at ' + i[1] + ' is still running.')
+            # 如果没有输出
+            if i[2].replace('\n','').replace(' ','') == '':
+                temp.append('INFO: A process started at ' + i[1] + ' is still running.')
+            # 如果已有输出
+            else:
+                temp.append('INFO: A process started at ' + i[1] + ' is still running with following content: \n' + i[2])
         return "\n".join(temp)+'\nINFO: No other process running. Do not repeatedly run this command.'
     
     elif shell[:6]=="volume":
@@ -563,17 +592,36 @@ def run_shell():
                 shells[i] = shells[i] + " | Write-Host"
         # ------------------------------------------------
         #                                    必须修！↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-        running_processes.append([subprocess.Popen(["powershell", "-Command", "\n".join(shells)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,creationflags=subprocess.CREATE_NO_WINDOW),now_time()])
+        running_processes.append([subprocess.Popen(["powershell", "-Command", "\n".join(shells)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,creationflags=subprocess.CREATE_NO_WINDOW),now_time(),''])
         write_log('Shell running: ' + "powershell -Command " + "\n".join(shells))
 
         # 等待4秒，超时后转入后台运行
         for i in range(10):
             time.sleep(0.4)
+
+            # 若进程未结束
+            if running_processes[-1][0].poll() is None:
+                # 获取handle
+                handle = msvcrt.get_osfhandle(running_processes[-1][0].stdout.fileno())
+                # 若有输出
+                if _winapi.PeekNamedPipe(handle, 0)[0] > 0:
+                    # 读取输出
+                    data= _winapi.ReadFile(handle, _winapi.PeekNamedPipe(handle, 0)[0])[0]
+                    try:
+                        # 尝试解码
+                        running_processes[-1][2] = running_processes[-1][2] + data.decode('GBK') # 输出是自带换行的
+                    except UnicodeDecodeError:
+                        # 否则报错
+                        running_processes[-1][2] = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
+                        # 已经编码错误了就别试了
+                        running_processes[-1][0].kill()
+
+            # 若进程已结束
             if running_processes[-1][0].poll() is not None:
                 try:
-                    result = "".join(running_processes[-1][0].communicate())
+                    result = running_processes[-1][2] + "".join(running_processes[-1][0].communicate())
                 except:
-                    result = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding."
+                    result = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
                 running_processes.pop()
                 break
 
