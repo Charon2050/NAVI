@@ -205,17 +205,20 @@ def check_completed_processes():
                 # 获取handle
                 handle = msvcrt.get_osfhandle(running_processes[i][0].stdout.fileno())
                 # 若有输出
-                if _winapi.PeekNamedPipe(handle, 0)[0] > 0:
-                    # 读取输出
-                    data= _winapi.ReadFile(handle, _winapi.PeekNamedPipe(handle, 0)[0])[0]
-                    try:
-                        # 尝试解码
-                        running_processes[i][2] = running_processes[i][2] + data.decode('GBK') # 输出是自带换行的
-                    except UnicodeDecodeError:
-                        # 否则报错
-                        running_processes[i][2] = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
-                        # 已经编码错误了就别试了
-                        running_processes[i][0].kill()
+                try: # 下面这行执行时，有小概率报错「管道已结束」
+                    if _winapi.PeekNamedPipe(handle, 0)[0] > 0:
+                        # 读取输出
+                        data= _winapi.ReadFile(handle, _winapi.PeekNamedPipe(handle, 0)[0])[0]
+                        try:
+                            # 尝试解码
+                            running_processes[i][2] = running_processes[i][2] + data.decode('GBK') # 输出是自带换行的
+                        except UnicodeDecodeError:
+                            # 否则报错
+                            running_processes[i][2] = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
+                            # 已经编码错误了就别试了
+                            running_processes[i][0].kill()
+                except BrokenPipeError:
+                    pass
 
             # 若进程已结束
             else:
@@ -302,7 +305,7 @@ Start notepad somefile.txt
 
 不过，如果连续出错，必须停止尝试，告诉用户你无法完成操作，分析原因并给出建议。绝对不能编造未知的信息，如果没有看到 SystemMessage 代码块中的结果，就不可以说操作完成。除非用户要求，否则永远不要重复执行相同的命令。
 
-做出危险操作（如删除文件）前二次确认。如果是明显对电脑有害的操作（如格式化C盘），应当直接拒绝，即使用户这样要求。如果用户要求安装或卸载软件，优先尝试使用 winget 等方式，使用静默参数运行。
+做出危险操作（如删除文件）前二次确认。如果是明显对电脑有害的操作（如格式化C盘），应当直接拒绝，即使用户这样要求。如果用户要求安装或卸载软件，优先尝试使用 winget 等方式，使用静默参数运行。如果电脑中没有 winget，可以在 aka.ms/getwinget 下载。
 
 如果命令执行时间过长，会转入后台运行。运行完毕后，系统会使用 SystemMessage 代码块告知你，在看到代码块后，必须告诉用户什么进程已经完成了。SystemMessage 代码块是系统加入的，不是你或用户主动编写的，禁止编写 SystemMessage 代码块。
 
@@ -604,17 +607,20 @@ def run_shell():
                 # 获取handle
                 handle = msvcrt.get_osfhandle(running_processes[-1][0].stdout.fileno())
                 # 若有输出
-                if _winapi.PeekNamedPipe(handle, 0)[0] > 0:
-                    # 读取输出
-                    data= _winapi.ReadFile(handle, _winapi.PeekNamedPipe(handle, 0)[0])[0]
-                    try:
-                        # 尝试解码
-                        running_processes[-1][2] = running_processes[-1][2] + data.decode('GBK') # 输出是自带换行的
-                    except UnicodeDecodeError:
-                        # 否则报错
-                        running_processes[-1][2] = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
-                        # 已经编码错误了就别试了
-                        running_processes[-1][0].kill()
+                try: # 下面这行执行时，有小概率报错「管道已结束」
+                    if _winapi.PeekNamedPipe(handle, 0)[0] > 0:
+                        # 读取输出
+                        data= _winapi.ReadFile(handle, _winapi.PeekNamedPipe(handle, 0)[0])[0]
+                        try:
+                            # 尝试解码
+                            running_processes[-1][2] = running_processes[-1][2] + data.decode('GBK') # 输出是自带换行的
+                        except UnicodeDecodeError:
+                            # 否则报错
+                            running_processes[-1][2] = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
+                            # 已经编码错误了就别试了
+                            running_processes[-1][0].kill()
+                except BrokenPipeError:
+                    pass
 
             # 若进程已结束
             if running_processes[-1][0].poll() is not None:
