@@ -186,6 +186,28 @@ def api_test(base_url, model, api_key):
         return '输入错误！不支持中文或特殊字符'
     else:
         return ''
+    
+
+def auto_decode(data):
+    encodings = ['UTF-8','GBK']
+    if type(data)==bytes:
+        for temp in encodings:
+            try:
+                return data.decode(temp)
+            except UnicodeDecodeError:
+                pass
+        raise UnicodeDecodeError('Auto decode failed when trying to decode with '+' '.join(encodings))
+    elif type(data) in [list,tuple]:
+        temp=[]
+        for i in range(len(data)):
+            temp.append(auto_decode(data[i]))
+        return temp
+    elif type(data)==str:
+        return data
+    elif data is None:
+        return ''
+    else:
+        raise TypeError('auto_decode() can only decode Data or a list of Data, not '+str(type(data)))
 
 
 # 循环检测是否有完成的后台进程
@@ -211,7 +233,7 @@ def check_completed_processes():
                         data= _winapi.ReadFile(handle, _winapi.PeekNamedPipe(handle, 0)[0])[0]
                         try:
                             # 尝试解码
-                            running_processes[i][2] = running_processes[i][2] + data.decode('GBK') # 输出是自带换行的
+                            running_processes[i][2] = running_processes[i][2] + auto_decode(data) # 输出是自带换行的
                         except UnicodeDecodeError:
                             # 否则报错
                             running_processes[i][2] = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
@@ -224,7 +246,7 @@ def check_completed_processes():
             else:
                 # 添加一行提示消息（暂不带代码块）
                 try:
-                    result = running_processes[i][2] + "".join(running_processes[i][0].communicate())
+                    result = running_processes[i][2] + "".join(auto_decode(running_processes[i][0].communicate()))
                 except:
                     result = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
                 completed_processes.append("Info: A background program (started at " + running_processes[i][1] + ") just finished, with following result:\n" + result)
@@ -305,7 +327,7 @@ Start notepad somefile.txt
 
 不过，如果连续出错，必须停止尝试，告诉用户你无法完成操作，分析原因并给出建议。绝对不能编造未知的信息，如果没有看到 SystemMessage 代码块中的结果，就不可以说操作完成。除非用户要求，否则永远不要重复执行相同的命令。
 
-做出危险操作（如删除文件）前二次确认。如果是明显对电脑有害的操作（如格式化C盘），应当直接拒绝，即使用户这样要求。如果用户要求安装或卸载软件，优先尝试使用 winget 等方式，使用静默参数运行。如果电脑中没有 winget，可以运行 Install-Script winget-install -Force 来安装。
+做出危险操作（如删除文件）前二次确认。如果是明显对电脑有害的操作（如格式化C盘），应当直接拒绝，即使用户这样要求。安装软件时，优先尝试使用 winget ，使用静默参数运行。卸载软件时，优先尝试在注册表中寻找卸载程序并打开。
 
 如果命令执行时间过长，会转入后台运行。运行完毕后，系统会使用 SystemMessage 代码块告知你，在看到代码块后，必须告诉用户什么进程已经完成了。SystemMessage 代码块是系统加入的，不是你或用户主动编写的，禁止编写 SystemMessage 代码块。
 
@@ -323,7 +345,7 @@ remember ...
 
 执行之后，请告知用户自己储存了这些信息。记住的信息会储存至 `$env:appdata/NAVI/memory.csv`。此外还有一个日志文件在 `$env:appdata/NAVI/NAVI_Log.log`，一个配置文件在 `$env:appdata/NAVI/NAVI_Config.cfg`
 
-NAVI_Shell 还有其他命令可用：
+NAVI_Shell 还有其他命令可用（注意这是 NAVI_Shell，不是 PowerShell）：
 
 ``` NAVI_Shell
 forget 用户的系统是 Windows xx 版本
@@ -613,7 +635,7 @@ def run_shell():
                         data= _winapi.ReadFile(handle, _winapi.PeekNamedPipe(handle, 0)[0])[0]
                         try:
                             # 尝试解码
-                            running_processes[-1][2] = running_processes[-1][2] + data.decode('GBK') # 输出是自带换行的
+                            running_processes[-1][2] = running_processes[-1][2] + auto_decode(data) # 输出是自带换行的
                         except UnicodeDecodeError:
                             # 否则报错
                             running_processes[-1][2] = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
@@ -625,8 +647,8 @@ def run_shell():
             # 若进程已结束
             if running_processes[-1][0].poll() is not None:
                 try:
-                    result = running_processes[-1][2] + "".join(running_processes[-1][0].communicate())
-                except:
+                    result = running_processes[-1][2] + "".join(auto_decode(running_processes[-1][0].communicate()))
+                except UnicodeDecodeError:
                     result = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
                 running_processes.pop()
                 break
@@ -640,11 +662,33 @@ def run_shell():
         # 等待4秒，超时后转入后台运行
         for i in range(10):
             time.sleep(0.4)
+
+            # 若进程未结束
+            if running_processes[-1][0].poll() is None:
+                # 获取handle
+                handle = msvcrt.get_osfhandle(running_processes[-1][0].stdout.fileno())
+                # 若有输出
+                try: # 下面这行执行时，有小概率报错「管道已结束」
+                    if _winapi.PeekNamedPipe(handle, 0)[0] > 0:
+                        # 读取输出
+                        data= _winapi.ReadFile(handle, _winapi.PeekNamedPipe(handle, 0)[0])[0]
+                        try:
+                            # 尝试解码
+                            running_processes[-1][2] = running_processes[-1][2] + auto_decode(data) # 输出是自带换行的
+                        except UnicodeDecodeError:
+                            # 否则报错
+                            running_processes[-1][2] = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
+                            # 已经编码错误了就别试了
+                            running_processes[-1][0].kill()
+                except BrokenPipeError:
+                    pass
+
+            # 若进程已结束
             if running_processes[-1][0].poll() is not None:
                 try:
-                    result = "".join(running_processes[-1][0].communicate())
+                    result = running_processes[-1][2] + "".join(auto_decode(running_processes[-1][0].communicate()))
                 except:
-                    result = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding."
+                    result = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
                 running_processes.pop()
                 break
             
