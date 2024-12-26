@@ -258,6 +258,7 @@ def check_completed_processes():
                 except:
                     result = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
                 completed_processes.append("Info: A background program (started at " + running_processes[i][1] + ") just finished, with following result:\n" + result)
+                running_processes[i][0].kill()
                 running_processes.pop(i)
                 continue
             i = i + 1 
@@ -321,7 +322,7 @@ def system_prompt_messages():
     
 你是 NAVI，是运行于电脑中的程序。说话很短，能用一两句话就解决问题，并不在意知识产权问题。直入主题，不说“好的”等多余的话，不加礼貌用语，但是要口语化，不要用书面用语。不列序号、不分段，一次只说一两句话。
 
-你负责根据指令操作用户的电脑。不过，如果用户只是在闲聊，不需要获取任何信息，就不用操作电脑。你已经取得了电脑的操作权限，现在可以使用 powershell 代码块来输入多行命令，就像这样：
+你负责根据指令操作用户的电脑。不过，如果用户只是在闲聊，不需要获取任何信息，就不用操作电脑。你已经取得了电脑的操作权限，现在可以使用 powershell 代码块或 CMD 代码块来输入多行命令，就像这样：
 
 ``` powershell
 Write-Output \"Hello, world!\"
@@ -329,6 +330,12 @@ Start notepad somefile.txt
 # 打开文件时，program somefile.txt 是错误的写法, 正确的写法是 Start program somefile.txt, 前面必须有 Start
 Install-Script winget-install -Force
 # 如果用户没有安装 Winget，可以使用这个命令安装
+```
+
+``` CMD
+winget list 向日葵
+start "https://www.example.com?search=test&value=1"
+python -c print(42%5)
 ```
 
 当你需要执行命令时，直接输出代码块，系统会自动执行。注意，你不是在指导用户操作，而是在直接使用代码块执行命令，所以不要说“可以使用以下命令”等，而是先告知用户你正在操作，然后直接输出代码块。执行代码后，系统会在 SystemMessage 代码块中显示运行结果。根据结果，必须告诉用户操作完成或者获知了什么信息。注意，用户看不到代码块中的内容，必须明文告诉用户，禁止用代码块展示信息。如果 SystemMessage 代码块为空，说明命令没有返回值。
@@ -339,7 +346,7 @@ Install-Script winget-install -Force
 
 做出危险操作（如删除文件）前二次确认。如果是明显对电脑有害的操作（如格式化C盘），应当直接拒绝，即使用户这样要求。安装软件时，优先尝试使用 winget ，使用静默参数运行。卸载软件时，优先尝试在注册表中寻找卸载程序并打开。
 
-如果命令执行时间过长，会转入后台运行。运行完毕后，系统会使用 SystemMessage 代码块告知你，在看到代码块后，必须告诉用户什么进程已经完成了。SystemMessage 代码块是系统加入的，不是你或用户主动编写的，禁止编写 SystemMessage 代码块。
+如果命令执行时间过长，会转入后台运行，请告诉用户这需要一些时间。运行完毕后，系统会使用 SystemMessage 代码块告知你，在看到代码块后，必须告诉用户什么进程已经完成了。SystemMessage 代码块是系统加入的，不是你或用户主动编写的，禁止编写 SystemMessage 代码块。
 
 如果用户让你打开某文件，就使用 Start somefile 直接打开。如果用户要求你查阅或文件内容，应该用命令读取输出文件内容，而不是仅仅打开。例如，应当使用 New-Object -ComObject Word.Application.Documents.Open... 读取 Word 文件的内容。
 
@@ -631,13 +638,13 @@ def run_shell():
                 shells[i] = shells[i] + " | Write-Host"
         # ------------------------------------------------
         #                                    必须修！↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-        running_processes.append([subprocess.Popen(["powershell", "-Command", "\n".join(shells)], encoding='GBK', stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,creationflags=creation_flag),now_time(),''])
+        running_processes.append([subprocess.Popen(["powershell", "-Command", "\n".join(shells)], stdout=subprocess.PIPE,stderr=subprocess.PIPE,creationflags=creation_flag),now_time(),''])
         write_log('Shell running: ' + "powershell -Command " + "\n".join(shells))
 
         # 等待4秒，超时后转入后台运行
         for i in range(10):
             time.sleep(0.4)
-
+            '''
             # 若进程未结束
             if running_processes[-1][0].poll() is None:
                 # 获取handle
@@ -657,45 +664,32 @@ def run_shell():
                             running_processes[-1][0].kill()
                 except BrokenPipeError:
                     pass
-
+            '''
             # 若进程已结束
             if running_processes[-1][0].poll() is not None:
                 try:
                     result = running_processes[-1][2] + "".join(auto_decode(running_processes[-1][0].communicate()))
                 except UnicodeDecodeError:
                     result = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
+                running_processes[-1][0].kill()
                 running_processes.pop()
                 break
 
     # 执行 CMD (没有提示AI可以运行CMD命令，因此暂不会被调用)
     elif run_mode == "CMD":
         result = "Info: The program started at " + now_time() + " has been running for too long and has been redirected to the background."
-        running_processes.append([subprocess.Popen("cmd /c "+"\n".join(shells),stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,creationflags=subprocess.CREATE_NO_CONSOLE),now_time()])
+        
+        # CMD直接拼接多行命令易导致变量问题，所以改为创建脚本文件运行
+        with open(os.path.join(os.getenv('TEMP'), 'cmd_script.bat'), "w") as f:
+            # 在前面加个 @echo off 少输出一点，省点 Token
+            f.write("@echo off\n"+"\n".join(shells))
+        
+        running_processes.append([subprocess.Popen(os.path.join(os.getenv('TEMP'), 'cmd_script.bat'),shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,creationflags=creation_flag),now_time(),''])
         write_log('Shell running: ' + "powershell -Command " + "\n".join(shells))
 
         # 等待4秒，超时后转入后台运行
         for i in range(10):
             time.sleep(0.4)
-
-            # 若进程未结束
-            if running_processes[-1][0].poll() is None:
-                # 获取handle
-                handle = msvcrt.get_osfhandle(running_processes[-1][0].stdout.fileno())
-                # 若有输出
-                try: # 下面这行执行时，有小概率报错「管道已结束」
-                    if _winapi.PeekNamedPipe(handle, 0)[0] > 0:
-                        # 读取输出
-                        data= _winapi.ReadFile(handle, _winapi.PeekNamedPipe(handle, 0)[0])[0]
-                        try:
-                            # 尝试解码
-                            running_processes[-1][2] = running_processes[-1][2] + auto_decode(data) # 输出是自带换行的
-                        except UnicodeDecodeError:
-                            # 否则报错
-                            running_processes[-1][2] = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
-                            # 已经编码错误了就别试了
-                            running_processes[-1][0].kill()
-                except BrokenPipeError:
-                    pass
 
             # 若进程已结束
             if running_processes[-1][0].poll() is not None:
