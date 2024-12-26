@@ -629,7 +629,7 @@ def run_shell():
                 shells[i] = shells[i] + " | Write-Host"
         # ------------------------------------------------
         #                                    必须修！↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-        running_processes.append([subprocess.Popen(["powershell", "-Command", "\n".join(shells)], encoding='utf-8', stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,creationflags=creation_flag),now_time(),''])
+        running_processes.append([subprocess.Popen(["powershell", "-Command", "\n".join(shells)], encoding='GBK', stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,creationflags=creation_flag),now_time(),''])
         write_log('Shell running: ' + "powershell -Command " + "\n".join(shells))
 
         # 等待4秒，超时后转入后台运行
