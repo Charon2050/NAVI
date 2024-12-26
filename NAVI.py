@@ -187,25 +187,33 @@ def api_test(base_url, model, api_key):
     else:
         return ''
     
-
+# 自动解码
 def auto_decode(data):
+    # 尝试列表
     encodings = ['UTF-8','GBK']
+    # 判断是否是字节类型
     if type(data)==bytes:
+        # 列出的所有编码类型逐个尝试
         for temp in encodings:
             try:
                 return data.decode(temp)
             except UnicodeDecodeError:
                 pass
+        # 若全部失败则抛出异常
         raise UnicodeDecodeError('Auto decode failed when trying to decode with '+' '.join(encodings))
+    # 若是列表，则递归到单个值
     elif type(data) in [list,tuple]:
         temp=[]
         for i in range(len(data)):
             temp.append(auto_decode(data[i]))
         return temp
+    # 若是字符串则直接返回其自身，增强鲁棒性
     elif type(data)==str:
         return data
+    # 没有就返回空字符串
     elif data is None:
         return ''
+    # 其他类型抛出异常
     else:
         raise TypeError('auto_decode() can only decode Data or a list of Data, not '+str(type(data)))
 
@@ -603,7 +611,11 @@ def run_shell():
     # 执行 PowerShell
     if run_mode == "PowerShell":
         result = "Info: The program started at " + now_time() + " has been running for too long and has been redirected to the background."
-        
+
+        # 是否显示窗口
+        creation_flag = subprocess.CREATE_NEW_CONSOLE
+        if hide_shell_output or simple_shell_output: creation_flag = subprocess.CREATE_NO_WINDOW
+
         # ------------------------------------------------
         # BUG: 运行多行命令时，如果结果类型不同，则会只输出第一种结果所属类型的结果。这会导致AI看不到结果时编造SystemMessage。测试用例：
         # "Get-CimInstance -ClassName Win32_LogicalDisk -Filter \"DriveType=3\" | Select-Object DeviceID,FreeSpace,Size",
@@ -617,7 +629,7 @@ def run_shell():
                 shells[i] = shells[i] + " | Write-Host"
         # ------------------------------------------------
         #                                    必须修！↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-        running_processes.append([subprocess.Popen(["powershell", "-Command", "\n".join(shells)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,creationflags=subprocess.CREATE_NO_WINDOW),now_time(),''])
+        running_processes.append([subprocess.Popen(["powershell", "-Command", "\n".join(shells)], encoding='utf-8', stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,creationflags=creation_flag),now_time(),''])
         write_log('Shell running: ' + "powershell -Command " + "\n".join(shells))
 
         # 等待4秒，超时后转入后台运行
