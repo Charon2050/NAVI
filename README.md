@@ -58,7 +58,7 @@ pip install -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple openai
 
 ## 配置文件
 
-配置文件位于 `%AppData%/NAVI/NAVI_Config.cfg`，内容如下（注意配置文件目前不支持注释，请不要写入注释）：
+配置文件位于 `%AppData%/NAVI/NAVI_Config.cfg`，内容如下：
 
 ```
 {
