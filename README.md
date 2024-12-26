@@ -9,20 +9,11 @@
 
 0. 请准备一个对话大语言模型的 API Key。推荐前往 [DeepSeek 开放平台](https://platform.deepseek.com/api_keys) 获取。
 
-1. 请准备 [Python 3.7 +](https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe) 运行环境，并安装 openai 库。
+1. [下载本程序](https://github.com/Charon2050/NAVI/releases/download/v0.2/NAVI_Windows.zip)。
 
-```
-# 默认源
-pip install openai
-# 清华源，和上面那条选一个执行就好
-pip install -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple openai
-```
+2. 解压本程序。
 
-2. [下载本程序](https://github.com/Charon2050/NAVI/releases/download/v0.1/NAVI_Windows.zip)。
-
-3. 解压本程序。
-
-4. (可选) 添加环境变量：右键此电脑 - 属性 - 高级系统设置 - 环境变量 - 双击 Path 行 - 在最下方的空行粘贴本程序所在路径。此后，可以直接在 CMD 中或 Win+R 中输入 `NAVI` 或 `NAVI 要说的话` 来启动本程序。
+3. (可选) 添加环境变量：运行 `Install_Env_Path.bat`，然后输入 `y` 确认添加。此后，可以直接在 CMD 中或 Win+R 中输入 `NAVI` 或 `NAVI 要说的话` 来启动本程序。
 
 ## 首次运行
 
