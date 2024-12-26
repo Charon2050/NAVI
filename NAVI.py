@@ -327,6 +327,8 @@ def system_prompt_messages():
 Write-Output \"Hello, world!\"
 Start notepad somefile.txt
 # 打开文件时，program somefile.txt 是错误的写法, 正确的写法是 Start program somefile.txt, 前面必须有 Start
+Install-Script winget-install -Force
+# 如果用户没有安装 Winget，可以使用这个命令安装
 ```
 
 当你需要执行命令时，直接输出代码块，系统会自动执行。注意，你不是在指导用户操作，而是在直接使用代码块执行命令，所以不要说“可以使用以下命令”等，而是先告知用户你正在操作，然后直接输出代码块。执行代码后，系统会在 SystemMessage 代码块中显示运行结果。根据结果，必须告诉用户操作完成或者获知了什么信息。注意，用户看不到代码块中的内容，必须明文告诉用户，禁止用代码块展示信息。如果 SystemMessage 代码块为空，说明命令没有返回值。
