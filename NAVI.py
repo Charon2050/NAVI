@@ -309,7 +309,7 @@ def check_completed_processes():
                     run_shell()
             # 输出一个 'USER: ' 输入提示，提示用户依然处于等待输入状态
             print("\033[1;33m"+user_name+": "+"\033[0m",end='',flush=True) # 有些控制台必须刷新才能显示出不换行的消息
-        time.sleep(5)
+        time.sleep(2)
 
 
 def now_time():
@@ -340,17 +340,15 @@ python -c print(42%5)
 
 当你需要执行命令时，直接输出代码块，系统会自动执行。注意，你不是在指导用户操作，而是在直接使用代码块执行命令，所以不要说“可以使用以下命令”等，而是先告知用户你正在操作，然后直接输出代码块。执行代码后，系统会在 SystemMessage 代码块中显示运行结果。根据结果，必须告诉用户操作完成或者获知了什么信息。注意，用户看不到代码块中的内容，必须明文告诉用户，禁止用代码块展示信息。如果 SystemMessage 代码块为空，说明命令没有返回值。
 
-如果命令出错，不可以重复相同的命令，应提出修正办法，并修改代码。例如，如果文件名不正确，应该列出同目录的所有文件，寻找近似的文件名。
+如果用户让你打开某文件，就使用 `Start somefile` 直接打开。如果用户要求你查阅、理解、修改文件内容，应该用命令读取输出文件内容，而不是仅仅打开。例如，使用 `New-Object -ComObject Word.Application.Documents.Open...` 读取 Word 文件的内容。
+
+一步一步来，不需要一次性完成所有指令，先收集信息，再操作。例如打开文件时，先列出文件名，再打开。搜索不到必要信息的话，就向用户询问。如果命令出错，应根据报错信息，提出修正办法，并修改代码。例如，如果文件名不正确，应该列出同目录的所有文件，寻找近似的文件名。
 
 不过，如果连续出错，必须停止尝试，告诉用户你无法完成操作，分析原因并给出建议。绝对不能编造未知的信息，如果没有看到 SystemMessage 代码块中的结果，就不可以说操作完成。除非用户要求，否则永远不要重复执行相同的命令。
 
 做出危险操作（如删除文件）前二次确认。如果是明显对电脑有害的操作（如格式化C盘），应当直接拒绝，即使用户这样要求。安装软件时，优先尝试使用 winget ，使用静默参数运行。卸载软件时，优先尝试在注册表中寻找卸载程序并打开。
 
 如果命令执行时间过长，会转入后台运行，请告诉用户这需要一些时间。运行完毕后，系统会使用 SystemMessage 代码块告知你，在看到代码块后，必须告诉用户什么进程已经完成了。SystemMessage 代码块是系统加入的，不是你或用户主动编写的，禁止编写 SystemMessage 代码块。
-
-如果用户让你打开某文件，就使用 Start somefile 直接打开。如果用户要求你查阅或文件内容，应该用命令读取输出文件内容，而不是仅仅打开。例如，应当使用 New-Object -ComObject Word.Application.Documents.Open... 读取 Word 文件的内容。
-
-如果缺少必要信息，如不知道文件名，应当先收集信息，例如在对应目录下列出所有文件并判断文件名。仍然搜索不到必要信息的话，就向用户询问。
 
 操作完成后，如果获知了一些日后可能用到的信息（如电脑硬件、重要网址、常用文件路径），请使用 NAVI_Shell 代码块记住这些信息，形成「记忆」。但不要重复已知的信息，不要记录短期的信息（如用户正在安装或浏览什么）。尽可能的简短精确，就像这样：
 
@@ -443,8 +441,14 @@ def fix_response(content):
     content = content.replace('```powershell\n','``` powershell\n')
 
     # 补丁：有些模型不遵守stop词，所以手动删掉第二个```之后的所有内容
-    if content.count('\n```') > 1:
-        content = content[:content.find('\n```',content.find('\n```')+1)]
+    if content.count('```') > 1:
+        content = content[:content.find('```',content.find('```')+1)]
+
+    # 防止模型自己输出 SystemMessage
+    if content.count('``` SystemMessage') > 0:
+        content = content[:content.find('``` SystemMessage')]
+        if content == '':
+            content = '\n'
 
     return content
 
