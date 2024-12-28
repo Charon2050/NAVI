@@ -158,8 +158,8 @@ waiting_input = False
 # 预置示例对话，引导一些比较蠢的模型正确输出
 example_message=[
     {'role': 'user', 'content': '请帮我打开文件资源管理器。'},
-    {'role': 'assistant', 'content': '好的，正在打开。\n\n``` powershell\nStart-Process explorer\n```'},
-    {'role': 'user', 'content': '``` SystemMessage\nShell compeleted with no error and no output.\n```'},
+    {'role': 'assistant', 'content': '好的，正在打开。\n\n```powershell\nStart-Process explorer\n```'},
+    {'role': 'user', 'content': '```SystemMessage\nShell compeleted with no error and no output.\n```'},
     {'role': 'assistant', 'content': '已打开文件资源管理器。'}
     ]
 
@@ -277,7 +277,7 @@ def check_completed_processes():
                 print("\033[34m<<<<< "+"\n<<<<< ".join(completed_processes)+"\033[0m")
             # 添加到历史消息
             messages.append({
-                "content": '``` SystemMessage\n'+'\n'.join(completed_processes)+'\n```',
+                "content": '```SystemMessage\n'+'\n'.join(completed_processes)+'\n```',
                 "role": "user"
                 })
             # 传给AI
@@ -302,11 +302,13 @@ def check_completed_processes():
             output_message(response.choices[0].message.content)
             # 如果 AI 继续写 shell，就run_shell()
             for i in response.choices[0].message.content.split("\n"):
-                if i[:4] == "``` ":
+                if i[:3] == "```" and i[3:].lower() in shell_mode:
                     write_log("LOGS: Detected shells, start to run it")
-                    if messages[-1].get("content").split("\n")[-1] != "```":
+                    # 如果没有代码块结尾就补一个，防止代码块有头无尾
+                    if messages[-1].get("content").count('```') % 2 == 1:
                         messages[-1]=dict(messages[-1], **{"content": messages[-1].get("content")+"\n```"})
                     run_shell()
+                    break
             # 输出一个 'USER: ' 输入提示，提示用户依然处于等待输入状态
             print("\033[1;33m"+user_name+": "+"\033[0m",end='',flush=True) # 有些控制台必须刷新才能显示出不换行的消息
         time.sleep(2)
@@ -324,7 +326,7 @@ def system_prompt_messages():
 
 你负责根据指令操作用户的电脑。不过，如果用户只是在闲聊，不需要获取任何信息，就不用操作电脑。你已经取得了电脑的操作权限，现在可以使用 powershell 代码块或 CMD 代码块来输入多行命令，就像这样：
 
-``` powershell
+```powershell
 Write-Output \"Hello, world!\"
 Start notepad somefile.txt
 # 打开文件时，program somefile.txt 是错误的写法, 正确的写法是 Start program somefile.txt, 前面必须有 Start
@@ -332,7 +334,7 @@ Install-Script winget-install -Force
 # 如果用户没有安装 Winget，可以使用这个命令安装
 ```
 
-``` CMD
+```CMD
 winget list 向日葵
 start "https://www.example.com?search=test&value=1"
 python -c print(42%5)
@@ -352,7 +354,7 @@ python -c print(42%5)
 
 操作完成后，如果获知了一些日后可能用到的信息（如电脑硬件、重要网址、常用文件路径），请使用 NAVI_Shell 代码块记住这些信息，形成「记忆」。但不要重复已知的信息，不要记录短期的信息（如用户正在安装或浏览什么）。尽可能的简短精确，就像这样：
 
-``` NAVI_Shell
+```NAVI_Shell
 remember 用户的系统是 Windows xx 版本
 remember ...
 remember ...
@@ -362,7 +364,7 @@ remember ...
 
 NAVI_Shell 还有其他命令可用（注意这是 NAVI_Shell，不是 PowerShell）：
 
-``` NAVI_Shell
+```NAVI_Shell
 forget 用户的系统是 Windows xx 版本
 // 从记忆中删除一条过时或错误信息。内容必须和一行已知信息完全一致。
 check_process
@@ -438,15 +440,15 @@ def voice_speek(content,voice=['Chinese','Japanese','English']):
 def fix_response(content):
 
     # 有些模型的代码块格式不一样，```和语言名之间没有空格，暂时为powershell补一个空格
-    content = content.replace('```powershell\n','``` powershell\n')
+    # content = content.replace('```powershell\n','``` powershell\n')
 
     # 补丁：有些模型不遵守stop词，所以手动删掉第二个```之后的所有内容
     if content.count('```') > 1:
         content = content[:content.find('```',content.find('```')+1)]
 
     # 防止模型自己输出 SystemMessage
-    if content.count('``` SystemMessage') > 0:
-        content = content[:content.find('``` SystemMessage')]
+    if content.count('```SystemMessage') > 0:
+        content = content[:content.find('```SystemMessage')]
         if content == '':
             content = '\n'
 
@@ -576,9 +578,9 @@ def user_input(message=""):
     # 输出结果（日后要改成流式的）
     output_message(response.choices[0].message.content)
     
-    # 如果有 Shell 就执行
+    # 如果有可执行的 Shell 就执行
     for i in messages[-1].get("content").split("\n"):
-        if i[:4] == "``` ":
+        if i[:3] == "```" and i[3:].lower() in shell_mode:
             # 如果没有代码块结尾就补一个，防止代码块有头无尾
             if messages[-1].get("content").count('```') % 2 == 1:
                 messages[-1]=dict(messages[-1], **{"content": messages[-1].get("content")+"\n```"})
@@ -602,12 +604,12 @@ def run_shell():
 
     # 从后往前找，删掉代码块开头之前（不含）的行
     for i in range(len(shells)-1,-1,-1):
-        if re.search(r"``` \w+",shells[i]):
+        if re.search(r"```\w+",shells[i]):
             shells = shells[i:]
             break
     
     # 确定shell的语言
-    run_mode=shell_mode.get(shells[0][4:].lower(),"not_a_runnable_language")
+    run_mode=shell_mode.get(shells[0][3:].lower(),"not_a_runnable_language")
 
     # 删掉代码块开头，只留下命令行
     shells.pop(0)
@@ -621,13 +623,14 @@ def run_shell():
         print("\033[34m>>>>> "+shells[0][:70]+"...\033[0m")
     else:
         print("\033[34m>>>>> "+"\n>>>>> ".join(shells)+"\033[0m")
+
+    # 是否显示窗口
+    creation_flag = subprocess.CREATE_NEW_CONSOLE
+    if hide_shell_output or simple_shell_output: creation_flag = subprocess.CREATE_NO_WINDOW
+
     # 执行 PowerShell
     if run_mode == "PowerShell":
         result = "Info: The program started at " + now_time() + " has been running for too long and has been redirected to the background."
-
-        # 是否显示窗口
-        creation_flag = subprocess.CREATE_NEW_CONSOLE
-        if hide_shell_output or simple_shell_output: creation_flag = subprocess.CREATE_NO_WINDOW
 
         # ------------------------------------------------
         # BUG: 运行多行命令时，如果结果类型不同，则会只输出第一种结果所属类型的结果。这会导致AI看不到结果时编造SystemMessage。测试用例：
@@ -679,7 +682,7 @@ def run_shell():
                 running_processes.pop()
                 break
 
-    # 执行 CMD (没有提示AI可以运行CMD命令，因此暂不会被调用)
+    # 执行 CMD
     elif run_mode == "CMD":
         result = "Info: The program started at " + now_time() + " has been running for too long and has been redirected to the background."
         
@@ -734,7 +737,7 @@ def run_shell():
 
     # 将结果添加至历史记录
     messages.append({
-        "content": "``` SystemMessage\n" + result + "\n```",
+        "content": "```SystemMessage\n" + result + "\n```",
         "role": "user"
     }) 
 
@@ -774,9 +777,9 @@ def run_shell():
     # 输出结果（日后要改成流式的）
     output_message(response.choices[0].message.content)
 
-    # 如果 AI 继续写 shell，就递归执行
+    # 如果 AI 继续写可执行的 shell，就递归执行
     for i in response.choices[0].message.content.split("\n"):
-        if i[:4] == "``` ":
+        if i[:3] == "```" and i[3:].lower() in shell_mode:
             # 如果没有代码块结尾就补一个，防止代码块有头无尾
             if messages[-1].get("content").split("\n")[-1] != "```":
                 messages[-1]=dict(messages[-1], **{"content": messages[-1].get("content")+"\n```"})
@@ -786,23 +789,26 @@ def run_shell():
 
 def output_message(message,no_new_line=False):
 
-    # 只输出代码块之前的内容
-    if message.count('```')>0:
-        message=message[:message.find('```')]
-
-    # 播放语音
-    if not quiet_mode: 
-        voice_speek(message.replace('\n','；'))
+    # 只输出可运行的 Shell 之前的内容
+    for i in range(len(message.split("\n"))):
+        if message.split("\n")[i][:3] == "```" and message.split("\n")[i][3:].lower() in shell_mode:
+            message = "\n".join(message.split("\n")[:i])
+            break
 
     # 逐行输出
     for i in message.split("\n"):
         if i != "":
             print("\033[1;36mNAVI: "+"\033[0m"+i,end='\n'*(not(no_new_line))) # 如果no_new_line=True则不换行
-            
+
+    # 播放语音
+    if not quiet_mode:
+        # 删掉全部代码块，包括无法运行的
+        if message.count('```')>0:
+            message=message[:message.find('```')]
+        voice_speek(message.replace('\n','；'))
 
 
 if __name__ == 'main' or True:
-
     
     write_log('')
     write_log('')
