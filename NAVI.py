@@ -63,7 +63,7 @@ def set_config(var,value):
                 config.update({var:value})
                 f.truncate(0); f.seek(0)
                 f.write(str(config).replace('{','{\n').replace('}','\n}').replace(', ',',\n'))
-                return 'Successfully set ' + var + ' to ' + value
+                return 'Successfully set ' + var + ' to ' + str(value)
         # 如果未能正确解析为字典
         except NameError:
             pass
@@ -286,7 +286,7 @@ def check_completed_processes():
                 model=model,
                 temperature=1,
                 max_tokens=1000,
-                stop=["\n```\n"],
+                stop=["\n```\n\n"],
                 stream=False,
                 messages=system_prompt_messages()+messages
             )
@@ -384,9 +384,6 @@ def voice_speek(content,voice=['Chinese','Japanese','English']):
 
 def fix_response(content):
 
-    # 有些模型的代码块格式不一样，```和语言名之间没有空格，暂时为powershell补一个空格
-    # content = content.replace('```powershell\n','``` powershell\n')
-
     # 补丁：有些模型不遵守stop词，所以手动删掉第二个```之后的所有内容
     if content.count('```') > 1:
         content = content[:content.find('```',content.find('```')+1)]
@@ -396,6 +393,12 @@ def fix_response(content):
         content = content[:content.find('```SystemMessage')]
         if content == '':
             content = '\n'
+
+    # 防止模型输出没有标注语言的代码块
+    if content.find('```') == content.find('```\n') and content.find('```')!=-1:
+        # 把代码块开头和结尾删掉
+        content = content[:content.find('```')] + content[content.find('```')+3:]
+        content = content[:content.find('```')] + content[content.find('```')+3:]
 
     return content
 
@@ -505,13 +508,13 @@ def user_input(message=""):
     # 写入历史记录
     messages.append({"role": "user", "content": message})
 
-    # 请求并获取回复（注意stop词是"\n```\n"，而不是"\n```"，否则会在代码块开头处被stop）
+    # 请求并获取回复（注意stop词是"\n```\n\n"，而不是"\n```"，否则会在代码块开头处被stop）
     write_log("Sent "+str(messages))
     response = client.chat.completions.create(
         model=model,
         temperature=1,
         max_tokens=1000,
-        stop=["\n```\n"],
+        stop=["\n```\n\n"],
         stream=False,
         messages=system_prompt_messages()+messages
     )
@@ -696,7 +699,7 @@ def run_shell():
             model=model,
             temperature=1,
             max_tokens=1000,
-            stop=["\n```\n"],
+            stop=["\n```\n\n"],
             stream=False,
             messages=system_prompt_messages()+messages
         )
@@ -707,7 +710,7 @@ def run_shell():
             model=model,
             temperature=1,
             max_tokens=100,
-            stop=["\n```\n"],
+            stop=["\n```\n\n"],
             stream=False,
             messages=[{"role":"system","content":"你必须立刻简短的告诉用户，上述操作重复次数过多，被系统强制中断了。"}]+[messages[-1]]
         )
