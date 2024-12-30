@@ -63,7 +63,7 @@ def set_config(var,value):
                 config.update({var:value})
                 f.truncate(0); f.seek(0)
                 f.write(str(config).replace('{','{\n').replace('}','\n}').replace(', ',',\n'))
-                return 'Successfully set ' + var + ' to ' + str(value)
+                return f'Successfully set {var} to {value}'
         # 如果未能正确解析为字典
         except NameError:
             pass
@@ -200,7 +200,7 @@ def auto_decode(data):
             except UnicodeDecodeError:
                 pass
         # 若全部失败则抛出异常
-        raise UnicodeDecodeError('Auto decode failed when trying to decode with '+' '.join(encodings))
+        raise UnicodeDecodeError(f'Auto decode failed when trying to decode with {' '.join(encodings)}')
     # 若是列表，则递归到单个值
     elif type(data) in [list,tuple]:
         temp=[]
@@ -215,7 +215,7 @@ def auto_decode(data):
         return ''
     # 其他类型抛出异常
     else:
-        raise TypeError('auto_decode() can only decode Data or a list of Data, not '+str(type(data)))
+        raise TypeError(f'auto_decode() can only decode Data or a list of Data, not {type(data)}')
 
 
 # 循环检测是否有完成的后台进程
@@ -257,7 +257,7 @@ def check_completed_processes():
                     result = running_processes[i][2] + "".join(auto_decode(running_processes[i][0].communicate()))
                 except:
                     result = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
-                completed_processes.append("Info: A background program (started at " + running_processes[i][1] + ") just finished, with following result:\n" + result)
+                completed_processes.append(f"Info: A background program (started at {running_processes[i][1]}) just finished, with following result:\n{result}")
                 running_processes[i][0].kill()
                 running_processes.pop(i)
                 continue
@@ -322,7 +322,7 @@ def system_prompt_messages():
 
     # 从 SystemPrompt.md 中读取 SystemPrompt
     with open('SystemPrompt.md', 'r', encoding='utf-8-sig') as f:
-        system_prompt = "当前时间：" + now_time() + "\n\n用户名：" + user_name + '\n\n' + f.read()
+        system_prompt = f"当前时间：{now_time()}\n\n用户名：{user_name}\n\n{f.read()}"
 
     # 若无memory.csv则创建一个
     if not os.path.exists(memory_file_path):
@@ -414,22 +414,22 @@ def navi_shell(shell):
             writer.writerows([])
         write_log('Created memory.csv')
 
-    if shell[:9]=="remember ":
+    if shell[:9]=='remember ':
         # 读取memory.csv到data
         with open(memory_file_path, mode='r', encoding='utf-8-sig') as file:
             reader = csv.reader(file)
             data = list(reader)
         # 检查是否已有此记忆
         if [shell[9:]] in data:
-            return "NAVI_Shell Error: Already remembered \""+shell[9:]+"\""
+            return f'NAVI_Shell Error: Already remembered "{shell[9:]}"'
         # 增加一行记忆
         data.append([shell[9:]])
         # 储存
         with open(memory_file_path, mode='w', encoding='utf-8-sig', newline='') as file:
             writer = csv.writer(file)
             writer.writerows(data)
-            write_log('Added to memory.csv: '+data[-1][0])
-            return "remembered "+shell[9:]
+            write_log(f'Added to memory.csv: {data[-1][0]}')
+            return f'remembered {shell[9:]}'
 
     elif shell[:7]=="forget ":
         # 读取memory.csv到data
@@ -438,12 +438,12 @@ def navi_shell(shell):
             data = list(reader)
         # 删除此记忆
         i = 0
-        temp = "NAVI_Shell Error: No such memory \""+shell[7:]+"\""
+        temp = f'NAVI_Shell Error: No such memory "{shell[7:]}"'
         while i < len(data):
             if data[i] == [shell[7:]]:
                 data.pop(i)
                 temp = "forgot "+shell[7:]
-                write_log('Deleted from memory.csv: '+shell[7:])
+                write_log(f'Deleted from memory.csv: {shell[7:]}')
                 continue
             i = i + 1
         # 储存
@@ -458,10 +458,10 @@ def navi_shell(shell):
             # 不管状态，全部都告诉AI仍在运行。因为运行完成后 check_completed_processes() 会自动汇报，如果这里也汇报，AI 就会收到两条完成消息，导致编造其中一条的结果
             # 如果没有输出
             if i[2].replace('\n','').replace(' ','') == '':
-                temp.append('INFO: A process started at ' + i[1] + ' is still running.')
+                temp.append(f'INFO: A process started at {i[1]} is still running.')
             # 如果已有输出
             else:
-                temp.append('INFO: A process started at ' + i[1] + ' is still running with following content: \n' + i[2])
+                temp.append(f'INFO: A process started at {i[1]} is still running with following content: \n{i[2]}')
         return "\n".join(temp)+'\nINFO: No other process running. Do not repeatedly run this command.'
     
     elif shell[:6]=="volume":
@@ -471,7 +471,7 @@ def navi_shell(shell):
             if int(shell[7:])>=0 and int(shell[7:])<=100:
                 tts_volume = int(shell[7:])
                 set_config('tts_volume',tts_volume)
-                return 'Volume set to '+str(tts_volume)
+                return f'Volume set to {str(tts_volume)}'
         return 'Error: Volume only support a Integer in 1-100.'
     
     elif shell[:9]=="user_name":
@@ -480,15 +480,15 @@ def navi_shell(shell):
         if shell[10:] and not ('\n' in shell[10:]):
             user_name = shell[10:]
             set_config('user_name',user_name)
-            return 'user_name set to '+user_name
+            return f'user_name set to {user_name}'
         return 'Error: user_name only support a one-line string without quotation mark.'
         
     
-    elif shell[:2]=="//":
-        return ""
+    elif shell[:2]=='//':
+        return ''
         
     else:
-        return "NAVI_Shell Error: No such command \""+shell.split(" ")[0]+"\""
+        return f'NAVI_Shell Error: No such command "{shell.split(" ")[0]}"'
 
 
 def user_input(message=""):
@@ -578,7 +578,7 @@ def run_shell():
 
     # 执行 PowerShell
     if run_mode == "PowerShell":
-        result = "Info: The program started at " + now_time() + " has been running for too long and has been redirected to the background."
+        result = f"Info: The program started at {now_time()} has been running for too long and has been redirected to the background."
 
         # ------------------------------------------------
         # BUG: 运行多行命令时，如果结果类型不同，则会只输出第一种结果所属类型的结果。这会导致AI看不到结果时编造SystemMessage。测试用例：
@@ -594,32 +594,11 @@ def run_shell():
         # ------------------------------------------------
         #                                    必须修！↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
         running_processes.append([subprocess.Popen(["powershell", "-Command", "\n".join(shells)], stdout=subprocess.PIPE,stderr=subprocess.PIPE,creationflags=creation_flag),now_time(),''])
-        write_log('Shell running: ' + "powershell -Command " + "\n".join(shells))
+        write_log('Shell running: powershell -Command ' + '\n'.join(shells))
 
         # 等待4秒，超时后转入后台运行
         for i in range(10):
             time.sleep(0.4)
-            '''
-            # 若进程未结束
-            if running_processes[-1][0].poll() is None:
-                # 获取handle
-                handle = msvcrt.get_osfhandle(running_processes[-1][0].stdout.fileno())
-                # 若有输出
-                try: # 下面这行执行时，有小概率报错「管道已结束」
-                    if _winapi.PeekNamedPipe(handle, 0)[0] > 0:
-                        # 读取输出
-                        data= _winapi.ReadFile(handle, _winapi.PeekNamedPipe(handle, 0)[0])[0]
-                        try:
-                            # 尝试解码
-                            running_processes[-1][2] = running_processes[-1][2] + auto_decode(data) # 输出是自带换行的
-                        except UnicodeDecodeError:
-                            # 否则报错
-                            running_processes[-1][2] = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
-                            # 已经编码错误了就别试了
-                            running_processes[-1][0].kill()
-                except BrokenPipeError:
-                    pass
-            '''
             # 若进程已结束
             if running_processes[-1][0].poll() is not None:
                 try:
@@ -632,7 +611,7 @@ def run_shell():
 
     # 执行 CMD
     elif run_mode == "CMD":
-        result = "Info: The program started at " + now_time() + " has been running for too long and has been redirected to the background."
+        result = f"Info: The program started at {now_time()} has been running for too long and has been redirected to the background."
         
         # CMD直接拼接多行命令易导致变量问题，所以改为创建脚本文件运行
         with open(os.path.join(os.getenv('TEMP'), 'cmd_script.bat'), "w") as f:
@@ -640,7 +619,7 @@ def run_shell():
             f.write("@echo off\n"+"\n".join(shells))
         
         running_processes.append([subprocess.Popen(os.path.join(os.getenv('TEMP'), 'cmd_script.bat'),shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,creationflags=creation_flag),now_time(),''])
-        write_log('Shell running: ' + "powershell -Command " + "\n".join(shells))
+        write_log('Shell running: powershell -Command ' + '\n'.join(shells))
 
         # 等待4秒，超时后转入后台运行
         for i in range(10):
@@ -685,7 +664,7 @@ def run_shell():
 
     # 将结果添加至历史记录
     messages.append({
-        "content": "```SystemMessage\n" + result + "\n```",
+        "content": f"```SystemMessage\n{result}\n```",
         "role": "user"
     }) 
 
@@ -745,8 +724,12 @@ def output_message(message,no_new_line=False):
 
     # 逐行输出
     for i in message.split("\n"):
-        if i != "":
-            print("\033[1;36mNAVI: "+"\033[0m"+i,end='\n'*(not(no_new_line))) # 如果no_new_line=True则不换行
+        if i != "" :    # 不输出空行
+            if i[:2] == '> ':
+                if not (hide_shell_output or simple_shell_output):
+                    print(f"\033[34m>>>>> {i}\033[0m")
+            else:
+                print("\033[1;36mNAVI: " + "\033[0m"+i,end='\n'*(not(no_new_line))) # 如果no_new_line=True则不换行
 
     # 播放语音
     if not quiet_mode:
@@ -785,13 +768,13 @@ if __name__ == 'main' or True:
             base_url=sys.argv[i+1]
             sys.argv.pop(i)
             sys.argv.pop(i)
-            write_log('base_url set to: ' + base_url)
+            write_log(f'base_url set to: {base_url}')
             continue
         if sys.argv[i].lower() in ["-m","-model"]:
             model=sys.argv[i+1]
             sys.argv.pop(i)
             sys.argv.pop(i)
-            write_log('model set to: ' + model)
+            write_log(f'model set to: {model}')
             continue
         if sys.argv[i].lower() in ["-noshell","-hideshell","-onlychat"]:
             # hide_shell_output 和 simple_shell_output 均开启时，hide_shell_output 优先生效
