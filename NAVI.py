@@ -316,10 +316,7 @@ def check_completed_processes():
             write_log("Received "+response.choices[0].message.content)
 
             # 结果加入历史记录
-            messages[-1].update({
-                "content": messages[-1].get("content")+response.choices[0].message.content,
-                "role": "assistant"
-                })
+            messages.append({"role": "assistant", "content": response.choices[0].message.content})
             # 输出结果（日后要改成流式的）
             output_message(response.choices[0].message.content)
             # 如果 AI 继续写 shell，就run_shell()
@@ -506,11 +503,11 @@ def navi_shell(shell):
         return 'Error: user_name only support a one-line string without quotation mark.'
         
     
-    elif shell[:2]=='//':
+    elif shell[:2]=='//' or shell=='':
         return ''
         
     else:
-        return f'NAVI_Shell Error: No such command "{shell.split(" ")[0]}"'
+        return f'NAVI_Shell Error: No such command "{shell.split(" ")[0]}". Is it a PowerShell or CMD command?'
 
 
 def user_input(message=""):
@@ -579,7 +576,7 @@ def run_shell():
             break
     
     # 确定shell的语言
-    run_mode=shell_mode.get(shells[0][3:].lower(),"not_a_runnable_language")
+    run_mode=shell_mode.get(shells[0][3:].lower(),shells[0][3:]) # 若找不到，则返回原文
 
     # 删掉代码块开头，只留下命令行
     shells.pop(0)
@@ -670,7 +667,7 @@ def run_shell():
 
     # 其他情况报错
     else:
-        result = "Error: Can not run this language. Only support PowerShell, CMD and NAVI_Shell."
+        result = f"Error: Can not run this language: {run_mode}. Only support PowerShell, CMD and NAVI_Shell."
 
     # 解释一下空的输出，防止 AI 以为失败了
     if result == '':
@@ -719,10 +716,11 @@ def run_shell():
     write_log("Received "+response.choices[0].message.content)
 
     # 结果加入历史记录
-    messages[-1].update({
-        "content": messages[-1].get("content")+response.choices[0].message.content,
-        "role": "assistant"
-        })
+    #messages[-1].update({
+    #    "content": messages[-1].get("content")+response.choices[0].message.content,
+    #    "role": "assistant"
+    #    })
+    messages.append({"role": "assistant", "content": response.choices[0].message.content})
     # 输出结果（日后要改成流式的）
     output_message(response.choices[0].message.content)
 
@@ -738,6 +736,8 @@ def run_shell():
 
 def output_message(message,no_new_line=False):
 
+    voice_content = ''
+
     # 只输出可运行的 Shell 之前的内容
     for i in range(len(message.split("\n"))):
         if message.split("\n")[i][:3] == "```" and message.split("\n")[i][3:].lower() in shell_mode:
@@ -752,17 +752,11 @@ def output_message(message,no_new_line=False):
                     print(f"\033[34m>>>>> {i}\033[0m")
             else:
                 print("\033[1;36mNAVI: " + "\033[0m"+i,end='\n'*(not(no_new_line))) # 如果no_new_line=True则不换行
+                voice_content = voice_content + i + '；'
 
     # 播放语音
     if not quiet_mode:
-        # 删掉全部代码块，包括无法运行的
-        if message.count('```')>0:
-            message=message[:message.find('```')]
-        # 删掉所有引用块所在行
-        for i in message.split('\n'):
-            if i[:2] == '> ':
-                message=message.replace(i,'')
-        voice_speek(message.replace('\n','；'))
+        voice_speek(voice_content)
 
 
 if __name__ == 'main' or True:
