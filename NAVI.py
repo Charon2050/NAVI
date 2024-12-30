@@ -1,7 +1,7 @@
 import sys, os, _winapi
 import msvcrt
 import time, re, ast
-import csv
+import csv, json
 import subprocess
 import threading
 from openai import OpenAI,AuthenticationError,APIConnectionError,BadRequestError,NotFoundError
@@ -156,13 +156,35 @@ running_processes = []
 waiting_input = False
 
 # 预置示例对话，引导一些比较蠢的模型正确输出
-example_message=[
-    {'role': 'user', 'content': '请帮我打开文件资源管理器。'},
-    {'role': 'assistant', 'content': '好的，正在打开。\n\n```powershell\nStart-Process explorer\n```'},
-    {'role': 'user', 'content': '```SystemMessage\nShell compeleted with no error and no output.\n```'},
-    {'role': 'assistant', 'content': '已打开文件资源管理器。'}
-    ]
+def example_messages():
 
+    default_example_messages = [
+                                {"role": "user", "content": "请帮我打开文件资源管理器。"},
+                                {"role": "assistant", "content": "好的，正在打开。\n\n```powershell\nStart-Process explorer\n```"},
+                                {"role": "user", "content": "```SystemMessage\nShell compeleted with no error and no output.\n```"},
+                                {"role": "assistant", "content": "已打开文件资源管理器。"},
+                                {"role": "user", "content": "请帮我设置在今晚23:59关机"},
+                                {"role": "assistant", "content": "> 分析：用户希望在指定时间关机，可以使用 `shutdown` 命令。\n>\n>为了计算倒计时时间，可以使用 `Get-Date` 计算时间差，然后用 `.TotalSeconds` 计算剩余秒数。\n\n正在设置...\n\n```powershell\n$shutdownTime = (Get-Date -Hour 23 -Minute 59 -Second 0)\n$timeSpan = $shutdownTime - (Get-Date)\n$seconds = [int]$timeSpan.TotalSeconds\nshutdown /s /t $seconds\n```"},
+                                {"role": "user", "content": "```SystemMessage\nShell compeleted with no error and no output.\n```"},
+                                {"role": "assistant", "content": "已设置在今晚23:59关机。"}
+                              ]
+    # 尝试打开 SampleMessages.json
+    try:
+        with open(os.path.dirname(running_path) + '\\SampleMessages.json', 'r') as f:
+            # 尝试读取消息列表
+            try:
+                messages = json.load(f)
+            # 如果读取失败，就创建一个空列表
+            except:
+                messages = default_example_messages
+                print("SampleMessages.json 似乎已损坏，请尝试删除或修复。")
+    # 如果不存在 SampleMessages.json，就创建一个
+    except FileNotFoundError:
+        messages = default_example_messages
+        with open(os.path.dirname(running_path) + '\\SampleMessages.json', 'w') as f:
+            json.dump(messages, f)
+    # 返回消息列表
+    return messages
 
 # 测试API可用性，可用返回空字符串，不可用返回错误提示
 def api_test(base_url, model, api_key):
@@ -322,7 +344,7 @@ def system_prompt_messages():
 
     # 从 SystemPrompt.md 中读取 SystemPrompt
     with open('SystemPrompt.md', 'r', encoding='utf-8-sig') as f:
-        system_prompt = f"当前时间：{now_time()}\n\n用户名：{user_name}\n\n{f.read()}"
+        system_prompt = f"当前时间：{now_time()}\n\n用户昵称：`{user_name}`\n\n当前运行路径：`{os.path.dirname(running_path)}\\`\n\n{f.read()}"
 
     # 若无memory.csv则创建一个
     if not os.path.exists(memory_file_path):
@@ -331,15 +353,15 @@ def system_prompt_messages():
         with open(memory_file_path, mode='w', encoding='utf-8-sig', newline='') as file:
             writer = csv.writer(file)
             writer.writerows([])
-            return [{"role":"system","content":system_prompt+"\n\n看起来，这是你与这位用户的第一次见面。如果用户没有要求你做事，可以先收集并记录这台电脑的信息，用 powershell 查询一下 CPU、GPU、内存、硬盘分区和总容量、用户名等信息，然后用 NAVI_Shell 代码块记住这些信息。"}]+example_message*example_mode
+            return [{"role":"system","content":system_prompt+"\n\n看起来，这是你与这位用户的第一次见面。如果用户没有要求你做事，可以先收集并记录这台电脑的信息，用 powershell 查询一下 CPU、GPU、内存、硬盘分区和总容量、用户名等信息，然后用 NAVI_Shell 代码块记住这些信息。"}]+example_messages()*example_mode
     
     # 读取memory.csv并返回
     with open(memory_file_path, mode='r', encoding='utf-8-sig') as file:
         memory_list = [item for sublist in list(csv.reader(file)) for item in sublist]
         if len(memory_list) == 0: 
-            return [{"role":"system","content":system_prompt+"\n\n看起来，这是你与这位用户的第一次见面。如果用户没有要求你做事，可以先收集并记录这台电脑的信息，用 powershell 查询一下 CPU、GPU、内存、硬盘分区和总容量、用户名等信息，然后用 NAVI_Shell 代码块记住这些信息。"}]+example_message*example_mode
+            return [{"role":"system","content":system_prompt+"\n\n看起来，这是你与这位用户的第一次见面。如果用户没有要求你做事，可以先收集并记录这台电脑的信息，用 powershell 查询一下 CPU、GPU、内存、硬盘分区和总容量、用户名等信息，然后用 NAVI_Shell 代码块记住这些信息。"}]+example_messages()*example_mode
         else:
-            return [{"role":"system","content":system_prompt+"\n\n目前 memory.csv 中已知的记忆信息：\n\n"+"\n".join(memory_list)}]+example_message*example_mode
+            return [{"role":"system","content":system_prompt+"\n\n目前 memory.csv 中已知的记忆信息：\n\n"+"\n".join(memory_list)}]+example_messages()*example_mode
 
 
 def write_log(log):
@@ -736,6 +758,10 @@ def output_message(message,no_new_line=False):
         # 删掉全部代码块，包括无法运行的
         if message.count('```')>0:
             message=message[:message.find('```')]
+        # 删掉所有引用块所在行
+        for i in message.split('\n'):
+            if i[:2] == '> ':
+                message=message.replace(i,'')
         voice_speek(message.replace('\n','；'))
 
 
@@ -745,7 +771,7 @@ if __name__ == 'main' or True:
     write_log('')
     write_log('----- New Program Start -----')
     # 处理参数
-    sys.argv.pop(0)
+    running_path = sys.argv.pop(0)
     skip_auth = read_config('skip_auth')
     simple_shell_output = read_config('simple_shell_output')
     hide_shell_output = read_config('hide_shell_output')
