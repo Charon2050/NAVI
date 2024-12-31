@@ -108,19 +108,8 @@ def read_config(var):
 shell_mode={
     "navi_shell":"NAVI_Shell",
     "powershell":"PowerShell",
-    "ps":"PowerShell",
-    "ps1":"PowerShell",
-    "pwsh":"PowerShell",
-    "console":"PowerShell",
-    "shell":"PowerShell",
     "cmd":"CMD",
-    "command":"CMD",
-    "batch":"CMD",
-    "bat":"CMD",
-    "python":"Python",
-    "py":"Python",
-    "systemmessage":"SystemMessage",
-    "system message":"SystemMessage"
+    #"python":"Python",
 }
 
 # 已测试: DeepSeek, 阿里通义(推荐), 智谱GLM, 讯飞星火(不推荐)
@@ -166,7 +155,7 @@ def example_messages():
                                 {"role": "user", "content": "请帮我设置在今晚23:59关机"},
                                 {"role": "assistant", "content": "> 分析：用户希望在指定时间关机，可以使用 `shutdown` 命令。\n>\n>为了计算倒计时时间，可以使用 `Get-Date` 计算时间差，然后用 `.TotalSeconds` 计算剩余秒数。\n\n正在设置...\n\n```powershell\n$shutdownTime = (Get-Date -Hour 23 -Minute 59 -Second 0)\n$timeSpan = $shutdownTime - (Get-Date)\n$seconds = [int]$timeSpan.TotalSeconds\nshutdown /s /t $seconds\n```"},
                                 {"role": "user", "content": "```SystemMessage\nShell compeleted with no error and no output.\n```"},
-                                {"role": "assistant", "content": "已设置在今晚23:59关机。"}
+                                {"role": "assistant", "content": "设置完成，你的电脑将在今晚23:59关机。"}
                               ]
     # 尝试打开 SampleMessages.json
     try:
