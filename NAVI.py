@@ -32,7 +32,7 @@ default_config = {
     'skip_auth': False,
     'simple_shell_output': True,
     'hide_shell_output': False,
-    'example_mode': False,
+    'example_mode': True,
     'quiet_mode': False,
 }
 
@@ -170,18 +170,18 @@ def example_messages():
                               ]
     # 尝试打开 SampleMessages.json
     try:
-        with open(os.path.dirname(running_path) + '\\SampleMessages.json', 'r') as f:
+        with open(running_path + 'SampleMessages.json', 'r', encoding='utf-8-sig') as f:
             # 尝试读取消息列表
             try:
                 messages = json.load(f)
             # 如果读取失败，就创建一个空列表
-            except:
+            except json.JSONDecodeError:
                 messages = default_example_messages
                 print("SampleMessages.json 似乎已损坏，请尝试删除或修复。")
     # 如果不存在 SampleMessages.json，就创建一个
     except FileNotFoundError:
         messages = default_example_messages
-        with open(os.path.dirname(running_path) + '\\SampleMessages.json', 'w') as f:
+        with open(running_path + 'SampleMessages.json', 'w') as f:
             json.dump(messages, f)
     # 返回消息列表
     return messages
@@ -279,7 +279,15 @@ def check_completed_processes():
                     result = running_processes[i][2] + "".join(auto_decode(running_processes[i][0].communicate()))
                 except:
                     result = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
+
+                # 缩减过长输出
+                result = re.sub(r'(\s)\1{3,}', r'\1\1', result) # 删除连续3个以上的空白字符
+                if len(result) > 2048:
+                    result = result[:1024]+"\n......\n" + result[-1024:]
+
+                # 添加到完成列表
                 completed_processes.append(f"Info: A background program (started at {running_processes[i][1]}) just finished, with following result:\n{result}")
+                # 释放进程
                 running_processes[i][0].kill()
                 running_processes.pop(i)
                 continue
@@ -341,7 +349,7 @@ def system_prompt_messages():
 
     # 从 SystemPrompt.md 中读取 SystemPrompt
     with open('SystemPrompt.md', 'r', encoding='utf-8-sig') as f:
-        system_prompt = f"当前时间：{now_time()}\n\n用户昵称：`{user_name}`\n\n当前运行路径：`{os.path.dirname(running_path)}\\`\n\n{f.read()}"
+        system_prompt = f"当前时间：{now_time()}\n\n用户昵称：`{user_name}`\n\n当前运行路径：`{running_path}\\`\n\n{f.read()}"
 
     # 若无memory.csv则创建一个
     if not os.path.exists(memory_file_path):
@@ -480,7 +488,12 @@ def navi_shell(shell):
                 temp.append(f'INFO: A process started at {i[1]} is still running.')
             # 如果已有输出
             else:
-                temp.append(f'INFO: A process started at {i[1]} is still running with following content: \n{i[2]}')
+                # 删除连续3个以上的空白字符
+                i[2] = re.sub(r'(\s)\1{3,}', r'\1\1', i[2])
+                # 缩减过长输出
+                if len(i[2]) > 1024:
+                    i[2] = i[2][:512]+"\n......\n" + i[2][-512:]
+                temp.append(f'INFO: A process started at {i[1]} is still running with following content: \n' + i[2])
         return "\n".join(temp)+'\nINFO: No other process running. Do not repeatedly run this command.'
     
     elif shell[:6]=="volume":
@@ -765,7 +778,8 @@ if __name__ == 'main' or True:
     write_log('')
     write_log('----- New Program Start -----')
     # 处理参数
-    running_path = sys.argv.pop(0)
+    running_path = os.getcwd() + '\\'
+    sys.argv.pop(0)
     skip_auth = read_config('skip_auth')
     simple_shell_output = read_config('simple_shell_output')
     hide_shell_output = read_config('hide_shell_output')
