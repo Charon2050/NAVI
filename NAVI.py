@@ -745,7 +745,7 @@ def output_message(message,no_new_line=False):
 
     # 逐行输出
     for i in message.split("\n"):
-        if i != "" :    # 不输出空行
+        if not i in ['','>','> ']:    # 不输出空行
             if i[:2] == '> ':
                 if not (hide_shell_output or simple_shell_output):
                     print(f"\033[34m>>>>> {i}\033[0m")
