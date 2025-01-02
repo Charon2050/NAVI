@@ -554,10 +554,9 @@ def user_input(message=""):
             break
 
     # 清理过长的记录
-    if len(messages) > max_round*2 :
+    while len(messages) > max_round*2 :
         messages.pop(0)
         messages.pop(0)
-        write_log('History messages too long, cleared. Current history messages: '+str(messages))
 
 
 def run_shell():
