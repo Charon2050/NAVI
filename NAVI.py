@@ -135,9 +135,6 @@ max_try_times = read_config('max_try_times')
 # 语音音量，0-100
 tts_volume = read_config('tts_volume')
 
-# 这个 messages 就是历史记录，注意是不包括 system prompt 的
-messages = []
-
 # 用于储存后台进程的二维列表，每个元素都是一个有3个元素的列表，running_processes[x][0]为后台进程，running_processes[x][1]为此进程开始的时间，running_processes[x][2]为输出和错误
 running_processes = []
 
@@ -148,14 +145,14 @@ waiting_input = False
 def example_messages():
 
     default_example_messages = [
-                                {"role": "user", "content": "请帮我打开文件资源管理器。"},
-                                {"role": "assistant", "content": "好的，正在打开。\n\n```powershell\nStart-Process explorer\n```"},
-                                {"role": "user", "content": "```SystemMessage\nShell compeleted with no error and no output.\n```"},
-                                {"role": "assistant", "content": "已打开文件资源管理器。"},
                                 {"role": "user", "content": "请帮我设置在今晚23:59关机"},
-                                {"role": "assistant", "content": "> 分析：用户希望在指定时间关机，可以使用 `shutdown` 命令。\n>\n>为了计算倒计时时间，可以使用 `Get-Date` 计算时间差，然后用 `.TotalSeconds` 计算剩余秒数。\n\n正在设置...\n\n```powershell\n$shutdownTime = (Get-Date -Hour 23 -Minute 59 -Second 0)\n$timeSpan = $shutdownTime - (Get-Date)\n$seconds = [int]$timeSpan.TotalSeconds\nshutdown /s /t $seconds\n```"},
+                                {"role": "assistant", "content": "> 分析：用户希望在指定时间关机，可以使用 `shutdown` 命令，定时关机的用法是 `shutdown /s /t xxx`，其中 xxx 为秒数。\n>\n>为了计算倒计时时间，可以使用 `Get-Date` 计算时间差，然后用 `.TotalSeconds` 计算剩余秒数。\n> \n> 因此，执行顺序为：\n> \n> 1. 计算当前时间到关机时间的时间差；\n> 2. 将时间差转换成整数秒数；\n> 3. 执行 `shutdown` 命令。\n\n正在设置...\n\n```powershell\n$shutdownTime = (Get-Date -Hour 23 -Minute 59 -Second 0)\n$timeSpan = $shutdownTime - (Get-Date)\n$seconds = [int]$timeSpan.TotalSeconds\nshutdown /s /t $seconds\n```"},
                                 {"role": "user", "content": "```SystemMessage\nShell compeleted with no error and no output.\n```"},
-                                {"role": "assistant", "content": "设置完成，你的电脑将在今晚23:59关机。"}
+                                {"role": "assistant", "content": "设置完成，电脑将在今晚23:59关机。"},
+                                {"role": "user", "content": "算了算了，先取消吧"},
+                                {"role": "assistant", "content": "> 分析：用户希望取消定时关机。由于刚才使用了 `shutdown` 命令定时关机，现在需要使用 `shutdown /a` 命令来取消定时关机。\n\n正在取消定时关机...\n\n```powershell\nshutdown /a\n```"},
+                                {"role": "user", "content": "```SystemMessage\nShell compeleted with no error and no output.\n```"},
+                                {"role": "assistant", "content": "已成功取消。"}
                               ]
     # 尝试打开 SampleMessages.json
     try:
@@ -766,6 +763,7 @@ if __name__ == 'main' or True:
     write_log('')
     write_log('')
     write_log('----- New Program Start -----')
+
     # 处理参数
     running_path = os.getcwd() + '\\'
     sys.argv.pop(0)
@@ -774,6 +772,7 @@ if __name__ == 'main' or True:
     hide_shell_output = read_config('hide_shell_output')
     example_mode = read_config('example_mode')
     quiet_mode = read_config('quiet_mode')
+
     i = 0
     while i < len(sys.argv):
         if sys.argv[i].lower() in ["-k","-key","-apikey","-api-key","-api_key"]:
@@ -840,6 +839,9 @@ if __name__ == 'main' or True:
         
     # 定义 OpenAI 客户端
     client = OpenAI(api_key=api_key, base_url=base_url)
+
+    # 这个 messages 就是历史记录，注意是不包括 system prompt 的
+    messages = example_messages()*example_mode +[]
     
     # 如果带消息参数启动，就先执行一轮
     if " ".join(sys.argv):
