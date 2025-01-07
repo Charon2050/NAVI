@@ -207,8 +207,8 @@ def auto_decode(data):
                 return data.decode(temp)
             except UnicodeDecodeError:
                 pass
-        # 若全部失败则抛出异常
-        raise UnicodeDecodeError(f'Auto decode failed when trying to decode with {' '.join(encodings)}')
+        # 若全部失败则抛出异常（此处直接用UTF8解码，必定异常）
+        return data.decode('UTF-8')
     # 若是列表，则递归到单个值
     elif type(data) in [list,tuple]:
         temp=[]
