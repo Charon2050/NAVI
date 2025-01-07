@@ -734,6 +734,28 @@ def run_shell():
 
 def output_message(message,no_new_line=False):
 
+    def markdown_to_console(text):
+
+        text=text.replace(r'\*','<navi_escaped_star_mark>')
+        text=text.replace(r'\`','<navi_escaped_backtick_mark>')
+
+        # **bold** -> \033[1mbold\033[0m
+        pattern = r'\*\*([^\*]+)\*\*'
+        text = re.sub(pattern, r'\033[1m\1\033[0m', text)
+
+        # *italic* -> \033[3mitalic\033[0m
+        pattern = r'\*([^*]+)\*'
+        text = re.sub(pattern, r'\033[3m\1\033[0m', text)
+
+        # `code` -> \033[7mcode\033[0m
+        pattern = r'`([^`]+)`'
+        text = re.sub(pattern, r'\033[7m\1\033[0m', text)
+
+        text=text.replace('<navi_escaped_star_mark>',     '*')
+        text=text.replace('<navi_escaped_backtick_mark>', '`')
+        
+        return text
+
     voice_content = ''
 
     # 只输出可运行的 Shell 之前的内容
@@ -749,7 +771,7 @@ def output_message(message,no_new_line=False):
                 if not (hide_shell_output or simple_shell_output):
                     print(f"\033[34m>>>>> {i}\033[0m")
             else:
-                print("\033[1;36mNAVI: " + "\033[0m"+i,end='\n'*(not(no_new_line))) # 如果no_new_line=True则不换行
+                print("\033[1;36mNAVI: " + "\033[0m" + markdown_to_console(i), end = '\n'*(not(no_new_line))) # 如果no_new_line=True则不换行
                 voice_content = voice_content + i + '；'
 
     # 播放语音
