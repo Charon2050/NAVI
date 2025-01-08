@@ -1,40 +1,52 @@
 import sys, os, _winapi
 import msvcrt
 import time, re, ast
-import csv, json
+import json
 import subprocess
 import threading
 from openai import OpenAI,AuthenticationError,APIConnectionError,BadRequestError,NotFoundError
 
 
 
-class memory:
+class memory():
+
+    # 若无memory.json则创建一个
+    def create_memory_file_if_not_exist(self):    
+        if not os.path.exists(memory_file_path):
+            if not os.path.exists(os.path.dirname(memory_file_path)):
+                os.makedirs(os.path.dirname(memory_file_path))
+            with open(memory_file_path, mode='w', encoding='utf-8-sig', newline='') as file:
+                json.dump({'memory': []}, file)
+                write_log('Created memory.json')
 
     # 在给定的长段prompt中寻找拥有相匹配的tag的memory
     def read(self,prompt=''):
+        memory().create_memory_file_if_not_exist()
         prompt = str(prompt)
         flitered_memory = []
         try:
             # 读取记忆文件
-            with open(memory_file_path, 'r',encoding='UTF8') as memory_file:
-                memory = json.load(memory_file)
+            with open(memory_file_path, 'r',encoding='utf-8-sig') as memory_file:
+                memories = json.load(memory_file)
         except:
-            # 如果文件不存在，返回空列表
-            memory = {'memory': []}
+            # 如果失败，返回空列表
+            print('\033[31m读取记忆文件失败！请尝试修复或删除 appdata/NAVI/memory.json\033[0m')
+            memories = {'memory': []}
         # 读取记忆文件中的记忆
-        memory = memory['memory']
+        memories = memories['memory']
         # 遍历每条记忆的tags
-        for i in memory:
+        for i in memories:
             # 逐个tag比对
             for temp in i['tags']:
                 # 若匹配，则加入返回列表，然后比对下一组
-                if temp in prompt:
+                if temp in prompt or prompt == '':
                     flitered_memory.append(f'#{i['index']} {i['content']}')
                     break
         return flitered_memory
     
     # 写入记忆
     def add(self,content,tags=['no_tag']):
+        memory().create_memory_file_if_not_exist()
 
         # ---处理输入的格式：content必须是str，tags转换成list---
         # 检查是否有内容
@@ -69,54 +81,57 @@ class memory:
 
         # 读取记忆文件
         try:
-            with open(memory_file_path, 'r',encoding='UTF8') as memory_file:
-                memory = json.load(memory_file)
+            with open(memory_file_path, 'r',encoding='utf-8-sig') as memory_file:
+                memories = json.load(memory_file)
         except:
-            memory = {'memory': []}
+            print('\033[31m读取记忆文件失败！请尝试修复或删除 appdata/NAVI/memory.json\033[0m')
+            memories = {'memory': []}
         # 检查是否有相同的记忆
-        for i in range(len(memory['memory'])):
-            if memory['memory'][i]['content'] == content:
+        for i in range(len(memories['memory'])):
+            if memories['memory'][i]['content'] == content:
                 # tags去重并合并
-                memory['memory'][i]['tags'] = list(set(memory['memory'][i]['tags'] + tags))
+                memories['memory'][i]['tags'] = list(set(memories['memory'][i]['tags'] + tags))
                 # 写入记忆文件
-                with open(memory_file_path, 'w',encoding='UTF8') as memory_file:
+                with open(memory_file_path, 'w',encoding='utf-8-sig') as memory_file:
                     # 以UTF8编码写入
-                    json.dump(memory, memory_file, ensure_ascii=False)
+                    json.dump(memories, memory_file, ensure_ascii=False)
                 return 'Memory already exists. Successful updated tags.'
         # 寻找可用的index
-        index_list = [item['index'] for item in memory['memory']]
+        index_list = [item['index'] for item in memories['memory']]
         index = max(index_list) + 1 if index_list else 0
         # 读取记忆文件中的记忆
-        memory = memory['memory']
+        memories = memories['memory']
         # 添加新的记忆
-        memory.append({"index": index, 'content': content, 'tags': tags})
+        memories.append({"index": index, 'content': content, 'tags': tags})
         # 写入记忆文件
-        with open(memory_file_path, 'w',encoding='UTF8') as memory_file:
+        with open(memory_file_path, 'w',encoding='utf-8-sig') as memory_file:
             # 以UTF8编码写入
-            json.dump({'memory': memory}, memory_file, ensure_ascii=False)
-        return 'Successfull added memory.'
+            json.dump({'memory': memories}, memory_file, ensure_ascii=False)
+        return f'Successfull added memory: #{index} {content}'
     
     # 删除记忆
     def delete(self,index):
+        memory().create_memory_file_if_not_exist()
         # 检查输入的格式
         if not isinstance(index, int):
             return 'Index must be an int.'
         # 读取记忆文件
         try:
-            with open(memory_file_path, 'r',encoding='UTF8') as memory_file:
-                memory = json.load(memory_file)
+            with open(memory_file_path, 'r',encoding='utf-8-sig') as memory_file:
+                memories = json.load(memory_file)
         except:
-            return 'No memory to delete.'
+            print('\033[31m读取记忆文件失败！请尝试修复或删除 appdata/NAVI/memory.json\033[0m')
+            return 'No memory deleted.'
         # 读取记忆文件中的记忆
-        memory = memory['memory']
+        memories = memories['memory']
         # 寻找要删除的记忆
-        for i in memory:
+        for i in memories:
             if i['index'] == index:
-                memory.remove(i)
+                memories.remove(i)
                 # 写入记忆文件
-                with open(memory_file_path, 'w',encoding='UTF8') as memory_file:
+                with open(memory_file_path, 'w',encoding='utf-8-sig') as memory_file:
                     # 以UTF8编码写入
-                    json.dump({'memory': memory}, memory_file, ensure_ascii=False)
+                    json.dump({'memory': memories}, memory_file, ensure_ascii=False)
                     return 'Successfull deleted memory.'
                 break
         return 'No such index to delete.'
@@ -128,7 +143,7 @@ if os.name == "nt":
 	os.system("")
 
 # 定义记忆文件保存路径
-memory_file_path = os.path.join(os.getenv('APPDATA'), 'NAVI', 'memory.csv')
+memory_file_path = os.path.join(os.getenv('APPDATA'), 'NAVI', 'memory.json')
 
 # 定义Log文件保存路径
 log_file_path = os.path.join(os.getenv('APPDATA'), 'NAVI', 'NAVI_Log.log')
@@ -311,7 +326,7 @@ def api_test(base_url, model, api_key):
 # 自动解码
 def auto_decode(data):
     # 尝试列表
-    encodings = ['UTF-8','GBK']
+    encodings = ['UTF-8','GBK','utf-8-sig']
     # 判断是否是字节类型
     if type(data)==bytes:
         # 列出的所有编码类型逐个尝试
@@ -441,57 +456,63 @@ def check_completed_processes():
 # 根据给定的一轮(或多轮)对话，自动识别并加入记忆中。只接受list格式
 def auto_add_memory(messages):
 
-    auto_add_memory_prompt = r'''你需要根据给出的对话记录，判断此轮对话中是否存在值得记忆的长期信息。如果有，请用标准JSON格式简短的记录信息，并为之设置 2 - 20 个便于日后搜索的关键词（tags）。
-    
-    标准 JSON 格式：
-    ```JSON
-    {
-        "content": "用户的系统是 Windows 10 企业版 LTSC",
-        "tags": ["系统","Windows","win","操作系统","企业版","LTSC","OS","系统版本"]
-    }
-    ```
-    
-    请注意，content 为字符串，tags 为字符串列表。
+    auto_add_memory_prompt = r'''你需要根据给出的对话记录，判断此轮对话中是否存在值得记忆的长期信息。如果有，请用标准JSON格式简短的记录信息，并为之设置 2 - 20 个便于日后搜索的关键词（tags）。每个关键词只允许使用 1 - 3 个汉字或 1 个单词。
 
-    如果没有值得记忆的长期信息，请直接告诉我“无值得记忆的长期信息”。
+标准 JSON 格式：
+```JSON
+{
+    "content": "用户的系统是 Windows 10 企业版 LTSC",
+    "tags": ["系统","Windows","win","企业版","LTSC","OS","版本"]
+}
+```
 
-    不要重复记录一样的信息。已经记录过的信息：
-    '''
+请注意，content 为字符串，tags 为字符串列表。
+
+如果没有值得记忆的长期信息，请直接告诉我“无值得记忆的长期信息”。不要记录临时的操作。
+
+不要重复记录一样的信息。如果此前记录的信息是错误的或过时的，请在 JSON 中加一行 `"delete": [x]` 来删掉编号为 x 的信息（可用 `"delete": [x,x,x]` 删掉多条信息）。已经记录过的信息：
+
+'''
 
     sample_messages = [
         {"role":"system", "content": auto_add_memory_prompt + '\n'.join(memory().read(str(messages)))},
         {"role":"user", "content": r'''User: 我电脑上的 Winget 损坏了，你用别的办法吧
-        
-        Assistant: > 分析：由于用户的电脑中无法使用 winget，可以尝试使用 Scoop 安装软件。首先检查 Scoop 是否安装。
-        
-        正在检查 Scoop 是否安装...
-        
-        ```cmd
-        where scoop
-        ```
-        
-        System: C:\Users\DefaultUser\scoop\shims\scoop
-        C:\Users\DefaultUser\scoop\shims\scoop.cmd
-        
-        Assistant: > 分析：系统返回了 Scoop 的位置，说明 Scoop 已安装，可以调用 Scoop 安装软件。
-        '''},
+
+Assistant: > 分析：由于用户的电脑中无法使用 winget，可以尝试使用 Scoop 安装软件。首先检查 Scoop 是否安装。
+         
+正在检查 Scoop 是否安装...
+         
+```cmd
+where scoop
+```
+System: C:\Users\DefaultUser\scoop\shims\scoop
+C:\Users\DefaultUser\scoop\shims\scoop.cmd
+Assistant: > 分析：系统返回了 Scoop 的位置，说明 Scoop 已安装，可以调用 Scoop 安装软件。
+'''},
         {"role":"assistant", "content":r'''```JSON
-        {
-            "content": "用户电脑中的 Winget 已损坏，无法使用",
-            "tags": ["winget","安装","系统"]
-        }
-        ```'''},
+{
+    "content": "用户电脑中的 Winget 已损坏，无法使用",
+    "tags": ["winget","安装","系统","包管理器","损坏","故障"]
+}
+```'''},
         {"role":"user", "content": r'''User: 先帮我打开京东吧
-        
-        Assistant: 正在打开京东...
-        ```powershell
-        Start "https://www.jd.com"
-        ```
-
-        System: Shell compeleted with no error and no output.
-
-        Assistant:  京东已打开。'''},
-        {"role":"assistant", "content":"无值得记忆的长期信息。"}
+Assistant: 正在打开京东...
+         
+```powershell
+Start "https://www.jd.com"
+```
+System: Shell compeleted with no error and no output.
+Assistant:  京东已打开。'''},
+        {"role":"assistant", "content":"无值得记忆的长期信息。"},
+        {"role":"user", "content": r'''User: 我电脑上的 Winget 修好了哦
+Assistant: 好的，以后可以优先使用 Winget 安装软件了。'''},
+        {"role":"assistant", "content":r'''```JSON
+{
+    "content": "用户电脑中的 Winget 可以使用",
+    "tags": ["winget","安装","系统","包管理器"],
+    "delete": [1]
+}
+```'''}
     ]
 
     response = client.chat.completions.create(
@@ -501,6 +522,7 @@ def auto_add_memory(messages):
         stream=False,
         messages = sample_messages + [{"role":"user", "content": str(messages)}]
     )
+    print(response.choices[0].message.content)
 
     # 从返回的信息中提取JSON
     new_memory = re.search(r'```JSON(.*?)```', response.choices[0].message.content, re.DOTALL)
@@ -513,6 +535,10 @@ def auto_add_memory(messages):
             temp = json.loads(new_memory)
             new_memory_content = temp['content']
             new_memory_tags = temp['tags']
+
+            if temp.get('delete') is not None:
+                for i in temp.get('delete'):
+                    memory().delete(i)
             if not (isinstance(new_memory_content,str) and isinstance(new_memory_tags, list)):
                 raise ValueError('content must be str and tags must be list!')
             for i in new_memory_tags:
@@ -525,6 +551,58 @@ def auto_add_memory(messages):
         return 'No Memory added.'
     else:
         return(memory().add(new_memory_content,new_memory_tags))
+    
+
+def manual_add_memory(content):
+
+    manual_add_memory_prompt = r'''你需要根据给出的信息，为之设置 2 - 20 个便于日后搜索的关键词（tags），并用标准JSON格式输出。每个关键词只允许使用 1 - 3 个汉字或 1 个单词。
+
+标准 JSON 格式：
+```JSON
+{
+    "tags": ["系统","Windows","win","企业版","LTSC","OS","版本"]
+}
+```
+
+请注意，tags 为字符串列表。'''
+
+    sample_messages = [
+        {"role":"system", "content": manual_add_memory_prompt + '\n'.join(memory().read(str(messages)))},
+        {"role":"user", "content": r'''用户的系统是 Windows 10 企业版 LTSC'''},
+        {"role":"assistant", "content":r'''```JSON
+{
+    "tags": ["系统","Windows","win","企业版","LTSC","OS","版本"]
+}
+```'''}
+    ]
+
+    tags = None
+    i = 0
+    while tags is None and i < 5:
+        i += 1
+        response = client.chat.completions.create(
+            model=model,
+            temperature=0.4,
+            max_tokens=300,
+            stream=False,
+            messages = sample_messages + [{"role":"user", "content": str(content)}]
+        )
+        # 从返回的信息中提取JSON
+        tags = re.search(r'```JSON(.*?)```', response.choices[0].message.content, re.DOTALL)
+        try:
+            temp = json.loads(tags.group()[8:-4])
+            new_memory_tags = temp['tags']
+            if not isinstance(new_memory_tags, list):
+                raise ValueError('tags must be a list!')
+            for i in new_memory_tags:
+                if not isinstance(i, str):
+                    raise ValueError('tags must be a list of str!')
+            return(memory().add(content,new_memory_tags))
+        except (json.decoder.JSONDecodeError, KeyError, ValueError):
+            pass
+
+    return 'Failed to add memory: Unable to create suitable tags.'
+
 
 def now_time():
     return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
@@ -533,24 +611,21 @@ def system_prompt_messages():
 
     # 从 SystemPrompt.md 中读取 SystemPrompt
     with open('SystemPrompt.md', 'r', encoding='utf-8-sig') as f:
-        system_prompt = f"当前时间：{now_time()}\n\n用户昵称：`{user_name}`\n\n当前运行路径：`{running_path}\\`\n\n{f.read()}"
-
-    # 若无memory.csv则创建一个
-    if not os.path.exists(memory_file_path):
-        if not os.path.exists(os.path.dirname(memory_file_path)):
-            os.makedirs(os.path.dirname(memory_file_path))
-        with open(memory_file_path, mode='w', encoding='utf-8-sig', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerows([])
-            return [{"role":"system","content":system_prompt+"\n\n看起来，这是你与这位用户的第一次见面。如果用户没有要求你做事，可以先收集并记录这台电脑的信息，用 powershell 查询一下 CPU、GPU、内存、硬盘分区和总容量、用户名等信息，然后用 NAVI_Shell 代码块记住这些信息。"}]+example_messages()*example_mode
+        system_prompt = f'''当前时间：{now_time()}
+        
+        用户昵称：`{user_name}`
+        
+        当前运行路径：`{running_path}\\`
+        
+        {f.read()}'''
     
-    # 读取memory.csv并返回
-    with open(memory_file_path, mode='r', encoding='utf-8-sig') as file:
-        memory_list = [item for sublist in list(csv.reader(file)) for item in sublist]
-        if len(memory_list) == 0: 
-            return [{"role":"system","content":system_prompt+"\n\n看起来，这是你与这位用户的第一次见面。如果用户没有要求你做事，可以先收集并记录这台电脑的信息，用 powershell 查询一下 CPU、GPU、内存、硬盘分区和总容量、用户名等信息，然后用 NAVI_Shell 代码块记住这些信息。"}]+example_messages()*example_mode
-        else:
-            return [{"role":"system","content":system_prompt+"\n\n目前 memory.csv 中已知的记忆信息：\n\n"+"\n".join(memory_list)}]+example_messages()*example_mode
+    # 读取memory并返回
+    memory_list = memory().read(messages[-8:])
+    if len(memory_list) == 0: 
+        memory_list = ['暂无相关的信息。']
+        if memory().read() == []:
+            return [{"role":"system","content":system_prompt+"\n\n看起来，这是你与这位用户的第一次见面。如果用户没有要求你做事，可以先先跟用户寒暄一下，收集并记录这台电脑的信息，用 powershell 查询一下 CPU、GPU、内存、硬盘分区和总容量、用户名等信息，然后用 NAVI_Shell 代码块记住这些信息。"}]
+    return [{"role":"system","content":system_prompt+"\n\n目前 memory.json 中相关已知的记忆信息：\n\n"+"\n".join(memory_list)}]
 
 def write_log(log):
 
@@ -661,51 +736,12 @@ def fix_response(content):
 def navi_shell(shell):
     global tts_volume
     global user_name
-    # 若无memory.csv则创建一个
-    if not os.path.exists(memory_file_path):
-        write_log('No memory.csv found, creating...')
-        with open(memory_file_path, mode='w', encoding='utf-8-sig', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerows([])
-        write_log('Created memory.csv')
 
     if shell[:9]=='remember ':
-        # 读取memory.csv到data
-        with open(memory_file_path, mode='r', encoding='utf-8-sig') as file:
-            reader = csv.reader(file)
-            data = list(reader)
-        # 检查是否已有此记忆
-        if [shell[9:]] in data:
-            return f'NAVI_Shell Error: Already remembered "{shell[9:]}"'
-        # 增加一行记忆
-        data.append([shell[9:]])
-        # 储存
-        with open(memory_file_path, mode='w', encoding='utf-8-sig', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerows(data)
-            write_log(f'Added to memory.csv: {data[-1][0]}')
-            return f'remembered {shell[9:]}'
+        return(manual_add_memory(shell[9:]))
 
     elif shell[:7]=="forget ":
-        # 读取memory.csv到data
-        with open(memory_file_path, mode='r', encoding='utf-8-sig') as file:
-            reader = csv.reader(file)
-            data = list(reader)
-        # 删除此记忆
-        i = 0
-        temp = f'NAVI_Shell Error: No such memory "{shell[7:]}"'
-        while i < len(data):
-            if data[i] == [shell[7:]]:
-                data.pop(i)
-                temp = "forgot "+shell[7:]
-                write_log(f'Deleted from memory.csv: {shell[7:]}')
-                continue
-            i = i + 1
-        # 储存
-        with open(memory_file_path, mode='w', encoding='utf-8-sig', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerows(data)
-            return temp
+        return(memory().delete(shell[7:]))
 
     elif shell[:13]=="check_process":
         temp = []
@@ -764,6 +800,12 @@ def user_input(message=""):
 
     global waiting_input
     waiting_input = False
+
+    global messages
+
+    # 如果没有记忆，说明是首次使用，清除 example_messages，提示 AI 收集相关信息
+    if memory().read() == []:
+        messages = []
 
     # 写入历史记录
     messages.append({"role": "user", "content": message})
