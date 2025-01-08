@@ -11,7 +11,6 @@ from openai import OpenAI,AuthenticationError,APIConnectionError,BadRequestError
 if os.name == "nt":
 	os.system("")
 
-
 # 定义记忆文件保存路径
 memory_file_path = os.path.join(os.getenv('APPDATA'), 'NAVI', 'memory.csv')
 
@@ -70,7 +69,6 @@ def set_config(var,value):
         print('警告：NAVI_Config.cfg 文件似乎格式有误，请查修或删除。本次未修改 NAVI_Config.cfg 文件。')
         return 'WARNING: Format of NAVI_Config.cfg seems incorrect. Failed to read content.'
 
-
 # 读取 config 文件
 def read_config(var):
 
@@ -103,7 +101,6 @@ def read_config(var):
         print('警告：NAVI_Config.cfg 文件似乎已损坏，请查修或删除。')
         return default_config[var]     # 返回默认值
 
-
 # 识别代码块的语言，键全小写
 shell_mode={
     "navi_shell":"NAVI_Shell",
@@ -112,7 +109,7 @@ shell_mode={
     #"python":"Python",
 }
 
-# 已测试: DeepSeek, 阿里通义(推荐), 智谱GLM, 讯飞星火(不推荐)
+# 已测试: DeepSeek(推荐), 阿里通义(推荐), 智谱GLM, 讯飞星火(不推荐)
 # 理论可支持任何兼容 OpenAI 格式调用的模型。但推荐使用代码能力较强的模型，不推荐使用免费模型。
 base_url = read_config('base_url')
 model = read_config('model')
@@ -141,7 +138,7 @@ running_processes = []
 # 等待用户输入时开启，用户输入后关闭，供check_completed_processes()判断自己是否仍需运行
 waiting_input = False
 
-# 预置示例对话，引导一些比较蠢的模型正确输出
+# 预置示例对话
 def example_messages():
 
     default_example_messages = [
@@ -224,7 +221,6 @@ def auto_decode(data):
     # 其他类型抛出异常
     else:
         raise TypeError(f'auto_decode() can only decode Data or a list of Data, not {type(data)}')
-
 
 # 循环检测是否有完成的后台进程
 def check_completed_processes():
@@ -326,10 +322,8 @@ def check_completed_processes():
             print("\033[1;33m"+user_name+": "+"\033[0m",end='',flush=True) # 有些控制台必须刷新才能显示出不换行的消息
         time.sleep(2)
 
-
 def now_time():
     return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
-
 
 def system_prompt_messages():
 
@@ -353,7 +347,6 @@ def system_prompt_messages():
             return [{"role":"system","content":system_prompt+"\n\n看起来，这是你与这位用户的第一次见面。如果用户没有要求你做事，可以先收集并记录这台电脑的信息，用 powershell 查询一下 CPU、GPU、内存、硬盘分区和总容量、用户名等信息，然后用 NAVI_Shell 代码块记住这些信息。"}]+example_messages()*example_mode
         else:
             return [{"role":"system","content":system_prompt+"\n\n目前 memory.csv 中已知的记忆信息：\n\n"+"\n".join(memory_list)}]+example_messages()*example_mode
-
 
 def write_log(log):
 
@@ -394,6 +387,51 @@ def voice_speek(content,voice=['Chinese','Japanese','English']):
         '#tts.Dispose()']
     subprocess.Popen(["powershell", "-Command", "\n".join(shells)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,creationflags=subprocess.CREATE_NO_WINDOW)
 
+def output_message(message,no_new_line=False):
+
+    def markdown_to_console(text):
+
+        text=text.replace(r'\*','<navi_escaped_star_mark>')
+        text=text.replace(r'\`','<navi_escaped_backtick_mark>')
+
+        # **bold** -> \033[1mbold\033[0m
+        pattern = r'\*\*([^\*]+)\*\*'
+        text = re.sub(pattern, r'\033[1m\1\033[0m', text)
+
+        # *italic* -> \033[3mitalic\033[0m
+        pattern = r'\*([^*]+)\*'
+        text = re.sub(pattern, r'\033[3m\1\033[0m', text)
+
+        # `code` -> \033[7mcode\033[0m
+        pattern = r'`([^`]+)`'
+        text = re.sub(pattern, r'\033[7m\1\033[0m', text)
+
+        text=text.replace('<navi_escaped_star_mark>',     '*')
+        text=text.replace('<navi_escaped_backtick_mark>', '`')
+        
+        return text
+
+    voice_content = ''
+
+    # 只输出可运行的 Shell 之前的内容
+    for i in range(len(message.split("\n"))):
+        if message.split("\n")[i][:3] == "```" and message.split("\n")[i][3:].lower() in shell_mode:
+            message = "\n".join(message.split("\n")[:i])
+            break
+
+    # 逐行输出
+    for i in message.split("\n"):
+        if not i in ['','>','> ']:    # 不输出空行
+            if i[:2] == '> ':
+                if not (hide_shell_output or simple_shell_output):
+                    print(f"\033[34m>>>>> {i}\033[0m")
+            else:
+                print("\033[1;36mNAVI: " + "\033[0m" + markdown_to_console(i), end = '\n'*(not(no_new_line))) # 如果no_new_line=True则不换行
+                voice_content = voice_content + i + '；'
+
+    # 播放语音
+    if not quiet_mode:
+        voice_speek(voice_content)
 
 def fix_response(content):
 
@@ -732,54 +770,7 @@ def run_shell():
             break
 
 
-def output_message(message,no_new_line=False):
-
-    def markdown_to_console(text):
-
-        text=text.replace(r'\*','<navi_escaped_star_mark>')
-        text=text.replace(r'\`','<navi_escaped_backtick_mark>')
-
-        # **bold** -> \033[1mbold\033[0m
-        pattern = r'\*\*([^\*]+)\*\*'
-        text = re.sub(pattern, r'\033[1m\1\033[0m', text)
-
-        # *italic* -> \033[3mitalic\033[0m
-        pattern = r'\*([^*]+)\*'
-        text = re.sub(pattern, r'\033[3m\1\033[0m', text)
-
-        # `code` -> \033[7mcode\033[0m
-        pattern = r'`([^`]+)`'
-        text = re.sub(pattern, r'\033[7m\1\033[0m', text)
-
-        text=text.replace('<navi_escaped_star_mark>',     '*')
-        text=text.replace('<navi_escaped_backtick_mark>', '`')
-        
-        return text
-
-    voice_content = ''
-
-    # 只输出可运行的 Shell 之前的内容
-    for i in range(len(message.split("\n"))):
-        if message.split("\n")[i][:3] == "```" and message.split("\n")[i][3:].lower() in shell_mode:
-            message = "\n".join(message.split("\n")[:i])
-            break
-
-    # 逐行输出
-    for i in message.split("\n"):
-        if not i in ['','>','> ']:    # 不输出空行
-            if i[:2] == '> ':
-                if not (hide_shell_output or simple_shell_output):
-                    print(f"\033[34m>>>>> {i}\033[0m")
-            else:
-                print("\033[1;36mNAVI: " + "\033[0m" + markdown_to_console(i), end = '\n'*(not(no_new_line))) # 如果no_new_line=True则不换行
-                voice_content = voice_content + i + '；'
-
-    # 播放语音
-    if not quiet_mode:
-        voice_speek(voice_content)
-
-
-if __name__ == 'main' or True:
+if __name__ == '__main__':
     
     write_log('')
     write_log('')
