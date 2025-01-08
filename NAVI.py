@@ -7,6 +7,122 @@ import threading
 from openai import OpenAI,AuthenticationError,APIConnectionError,BadRequestError,NotFoundError
 
 
+
+class memory:
+
+    # 在给定的长段prompt中寻找拥有相匹配的tag的memory
+    def read(self,prompt=''):
+        prompt = str(prompt)
+        flitered_memory = []
+        try:
+            # 读取记忆文件
+            with open(memory_file_path, 'r',encoding='UTF8') as memory_file:
+                memory = json.load(memory_file)
+        except:
+            # 如果文件不存在，返回空列表
+            memory = {'memory': []}
+        # 读取记忆文件中的记忆
+        memory = memory['memory']
+        # 遍历每条记忆的tags
+        for i in memory:
+            # 逐个tag比对
+            for temp in i['tags']:
+                # 若匹配，则加入返回列表，然后比对下一组
+                if temp in prompt:
+                    flitered_memory.append(f'#{i['index']} {i['content']}')
+                    break
+        return flitered_memory
+    
+    # 写入记忆
+    def add(self,content,tags=['no_tag']):
+
+        # ---处理输入的格式：content必须是str，tags转换成list---
+        # 检查是否有内容
+        if not content:
+            return 'No content to add.'
+        # 支持输入多位元组
+        if isinstance(content,(list,tuple,set)) and tags == ['no_tag']:
+            # 首位为content，之后为tags
+            if len(content) > 2:
+                content = [content[0],content[1:]]
+            # 仅有一个tag，且为str
+            if len(content) == 2 and isinstance(content[1], str):
+                tags = [content[1]]
+            # tags转换成list
+            if isinstance(content[1], (list,tuple,set)):
+                tags = list(content[1])
+            elif isinstance(content[1], str):
+                tags = [content[1]]
+            else:
+                return 'Tags must be a list, tuple or set.'
+            content = content[0]
+        # 检查格式
+        if not isinstance(content, str):
+            return 'Content must be a str.'
+        if not isinstance(tags, (list,tuple,set)):
+            return 'Tags must be a list, tuple or set.'
+        for i in tags:
+            if not isinstance(i, str):
+                return 'Tags must be a list of str.'
+        tags = list(tags)
+        # ---处理输入的格式完毕---
+
+        # 读取记忆文件
+        try:
+            with open(memory_file_path, 'r',encoding='UTF8') as memory_file:
+                memory = json.load(memory_file)
+        except:
+            memory = {'memory': []}
+        # 检查是否有相同的记忆
+        for i in range(len(memory['memory'])):
+            if memory['memory'][i]['content'] == content:
+                # tags去重并合并
+                memory['memory'][i]['tags'] = list(set(memory['memory'][i]['tags'] + tags))
+                # 写入记忆文件
+                with open(memory_file_path, 'w',encoding='UTF8') as memory_file:
+                    # 以UTF8编码写入
+                    json.dump(memory, memory_file, ensure_ascii=False)
+                return 'Memory already exists. Successful updated tags.'
+        # 寻找可用的index
+        index_list = [item['index'] for item in memory['memory']]
+        index = max(index_list) + 1 if index_list else 0
+        # 读取记忆文件中的记忆
+        memory = memory['memory']
+        # 添加新的记忆
+        memory.append({"index": index, 'content': content, 'tags': tags})
+        # 写入记忆文件
+        with open(memory_file_path, 'w',encoding='UTF8') as memory_file:
+            # 以UTF8编码写入
+            json.dump({'memory': memory}, memory_file, ensure_ascii=False)
+        return 'Successfull added memory.'
+    
+    # 删除记忆
+    def delete(self,index):
+        # 检查输入的格式
+        if not isinstance(index, int):
+            return 'Index must be an int.'
+        # 读取记忆文件
+        try:
+            with open(memory_file_path, 'r',encoding='UTF8') as memory_file:
+                memory = json.load(memory_file)
+        except:
+            return 'No memory to delete.'
+        # 读取记忆文件中的记忆
+        memory = memory['memory']
+        # 寻找要删除的记忆
+        for i in memory:
+            if i['index'] == index:
+                memory.remove(i)
+                # 写入记忆文件
+                with open(memory_file_path, 'w',encoding='UTF8') as memory_file:
+                    # 以UTF8编码写入
+                    json.dump({'memory': memory}, memory_file, ensure_ascii=False)
+                    return 'Successfull deleted memory.'
+                break
+        return 'No such index to delete.'
+
+
+
 # 用于支持Windows系统的彩色输出
 if os.name == "nt":
 	os.system("")
@@ -322,6 +438,94 @@ def check_completed_processes():
             print("\033[1;33m"+user_name+": "+"\033[0m",end='',flush=True) # 有些控制台必须刷新才能显示出不换行的消息
         time.sleep(2)
 
+# 根据给定的一轮(或多轮)对话，自动识别并加入记忆中。只接受list格式
+def auto_add_memory(messages):
+
+    auto_add_memory_prompt = r'''你需要根据给出的对话记录，判断此轮对话中是否存在值得记忆的长期信息。如果有，请用标准JSON格式简短的记录信息，并为之设置 2 - 20 个便于日后搜索的关键词（tags）。
+    
+    标准 JSON 格式：
+    ```JSON
+    {
+        "content": "用户的系统是 Windows 10 企业版 LTSC",
+        "tags": ["系统","Windows","win","操作系统","企业版","LTSC","OS","系统版本"]
+    }
+    ```
+    
+    请注意，content 为字符串，tags 为字符串列表。
+
+    如果没有值得记忆的长期信息，请直接告诉我“无值得记忆的长期信息”。
+
+    不要重复记录一样的信息。已经记录过的信息：
+    '''
+
+    sample_messages = [
+        {"role":"system", "content": auto_add_memory_prompt + '\n'.join(memory().read(str(messages)))},
+        {"role":"user", "content": r'''User: 我电脑上的 Winget 损坏了，你用别的办法吧
+        
+        Assistant: > 分析：由于用户的电脑中无法使用 winget，可以尝试使用 Scoop 安装软件。首先检查 Scoop 是否安装。
+        
+        正在检查 Scoop 是否安装...
+        
+        ```cmd
+        where scoop
+        ```
+        
+        System: C:\Users\DefaultUser\scoop\shims\scoop
+        C:\Users\DefaultUser\scoop\shims\scoop.cmd
+        
+        Assistant: > 分析：系统返回了 Scoop 的位置，说明 Scoop 已安装，可以调用 Scoop 安装软件。
+        '''},
+        {"role":"assistant", "content":r'''```JSON
+        {
+            "content": "用户电脑中的 Winget 已损坏，无法使用",
+            "tags": ["winget","安装","系统"]
+        }
+        ```'''},
+        {"role":"user", "content": r'''User: 先帮我打开京东吧
+        
+        Assistant: 正在打开京东...
+        ```powershell
+        Start "https://www.jd.com"
+        ```
+
+        System: Shell compeleted with no error and no output.
+
+        Assistant:  京东已打开。'''},
+        {"role":"assistant", "content":"无值得记忆的长期信息。"}
+    ]
+
+    response = client.chat.completions.create(
+        model=model,
+        temperature=0.5,
+        max_tokens=500,
+        stream=False,
+        messages = sample_messages + [{"role":"user", "content": str(messages)}]
+    )
+
+    # 从返回的信息中提取JSON
+    new_memory = re.search(r'```JSON(.*?)```', response.choices[0].message.content, re.DOTALL)
+    if new_memory :
+        new_memory = new_memory.group()[8:-4]
+
+    # 提取 content 和 tags
+    if new_memory != None:
+        try:
+            temp = json.loads(new_memory)
+            new_memory_content = temp['content']
+            new_memory_tags = temp['tags']
+            if not (isinstance(new_memory_content,str) and isinstance(new_memory_tags, list)):
+                raise ValueError('content must be str and tags must be list!')
+            for i in new_memory_tags:
+                if not isinstance(i, str):
+                    raise ValueError('tags must be a list of str!')
+        except (json.decoder.JSONDecodeError, KeyError, ValueError):
+            new_memory = None
+
+    if new_memory == None:
+        return 'No Memory added.'
+    else:
+        return(memory().add(new_memory_content,new_memory_tags))
+
 def now_time():
     return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
 
@@ -590,6 +794,12 @@ def user_input(message=""):
                 messages[-1]=dict(messages[-1], **{"content": messages[-1].get("content")+"\n```"})
             run_shell()
             break
+    
+    # 根据最后一轮对话添加记忆
+    for i in range(len(messages)-1, -1, -1):
+        if messages[i]["role"]=="user" and messages[i]["content"][:17]!='```SystemMessage\n':
+            auto_add_memory(messages[i:])
+            break
 
     # 清理过长的记录
     while len(messages) > max_round*2 :
@@ -752,10 +962,6 @@ def run_shell():
     write_log("Received "+response.choices[0].message.content)
 
     # 结果加入历史记录
-    #messages[-1].update({
-    #    "content": messages[-1].get("content")+response.choices[0].message.content,
-    #    "role": "assistant"
-    #    })
     messages.append({"role": "assistant", "content": response.choices[0].message.content})
     # 输出结果（日后要改成流式的）
     output_message(response.choices[0].message.content)
