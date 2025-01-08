@@ -522,7 +522,6 @@ Assistant: 好的，以后可以优先使用 Winget 安装软件了。'''},
         stream=False,
         messages = sample_messages + [{"role":"user", "content": str(messages)}]
     )
-    print(response.choices[0].message.content)
 
     # 从返回的信息中提取JSON
     new_memory = re.search(r'```JSON(.*?)```', response.choices[0].message.content, re.DOTALL)
