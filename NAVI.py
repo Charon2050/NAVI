@@ -755,6 +755,8 @@ def url_to_markdown(url):
         
         if result.returncode == 0:
             markdown_output = result.stdout 
+            if markdown_output.count(' ')+markdown_output.count('\n')==len(result.stdout):
+                return 'Successful load the web page, but failed to read the content.'
             markdown_output = markdown_output.replace('没有与此相关的结果','没有与此相关的结果(可能是由于所在IP被封禁，请尝试更换IP或搜索引擎)')
             markdown_output = markdown_output.replace('沒有任何結果適用於','沒有任何結果適用於(可能是由于所在IP被封禁，请尝试更换IP或搜索引擎):')
             markdown_output = markdown_output.replace('There are no results for','There are no results for (可能是由于所在IP被封禁，请尝试更换IP或搜索引擎):')
