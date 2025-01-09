@@ -1,9 +1,8 @@
 import sys, os, _winapi
 import msvcrt
-import time, re, ast
-import json
-import subprocess
-import threading
+import requests
+import time, re, ast, json
+import subprocess, threading
 from openai import OpenAI,AuthenticationError,APIConnectionError,BadRequestError,NotFoundError
 
 
@@ -623,7 +622,7 @@ def system_prompt_messages():
     if len(memory_list) == 0: 
         memory_list = ['暂无相关的信息。']
         if memory().read() == []:
-            return [{"role":"system","content":system_prompt+"\n\n看起来，这是你与这位用户的第一次见面。如果用户没有要求你做事，可以先先跟用户寒暄一下，收集并记录这台电脑的信息，用 powershell 查询一下 CPU、GPU、内存、硬盘分区和总容量、用户名等信息（注意要输出这些信息），然后用 NAVI_Shell 代码块记住这些信息。"}]
+            return [{"role":"system","content":system_prompt+"\n\n看起来，这是你与这位用户的第一次见面。如果用户没有要求你做事，可以先跟用户寒暄一下，收集并记录这台电脑的信息，用 powershell 查询一下 CPU、GPU、内存、硬盘分区和总容量、用户名等信息（注意要输出这些信息），然后用 NAVI_Shell 代码块记住这些信息。"}]
     return [{"role":"system","content":system_prompt+"\n\n目前 memory.json 中相关已知的记忆信息：\n\n"+"\n".join(memory_list)}]
 
 def write_log(log):
@@ -731,6 +730,41 @@ def fix_response(content):
 
     return content
 
+def url_to_markdown(url):
+    try:
+        # 获取HTML内容
+        response = requests.get(url)
+        response.raise_for_status()
+        html_content = response.text
+
+        if html_content.find('</head>') != -1:
+            html_content = html_content[html_content.find('</head>')+7:]
+        if html_content.find('<footer>') != -1:
+            html_content = html_content[:html_content.find('<footer>')]
+        html_content = re.sub(r'<nav.*?</nav>', '', html_content, flags=re.DOTALL)
+        html_content = re.sub(r'[A-Za-z0-9_-]{256,}', '...', html_content,)
+
+        # 调用html2markdown工具转换HTML为Markdown
+        result = subprocess.run(
+            'html2markdown --include-selector="p" --include-selector="h1" --include-selector="h2" --include-selector="h3" --include-selector="h4"', 
+            input=html_content, 
+            text=True, 
+            capture_output=True,
+            encoding='utf-8'  # 强制使用UTF-8编码
+        )
+        
+        if result.returncode == 0:
+            markdown_output = result.stdout 
+            markdown_output = markdown_output.replace('没有与此相关的结果','没有与此相关的结果(可能是由于所在IP被封禁，请尝试更换IP或搜索引擎)')
+            markdown_output = markdown_output.replace('沒有任何結果適用於','沒有任何結果適用於(可能是由于所在IP被封禁，请尝试更换IP或搜索引擎):')
+            markdown_output = markdown_output.replace('There are no results for','There are no results for (可能是由于所在IP被封禁，请尝试更换IP或搜索引擎):')
+            return markdown_output
+        else:
+            print("Read webpage Error:", result.stderr)
+            return "Read webpage Error:", result.stderr
+    except requests.exceptions.RequestException:
+        print(f"Error fetching URL: {url}. This may be caused by website bans or incorrect URL.")
+        return f"Error fetching URL: {url}. This may be caused by website bans or incorrect URL."
 
 def navi_shell(shell):
     global tts_volume
@@ -741,6 +775,9 @@ def navi_shell(shell):
 
     elif shell[:7]=="forget ":
         return(memory().delete(shell[7:]))
+    
+    elif shell[:4]=="web ":
+        return(url_to_markdown(shell[4:]))
 
     elif shell[:13]=="check_process":
         temp = []
