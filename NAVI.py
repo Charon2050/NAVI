@@ -623,7 +623,7 @@ def system_prompt_messages():
     if len(memory_list) == 0: 
         memory_list = ['暂无相关的信息。']
         if memory().read() == []:
-            return [{"role":"system","content":system_prompt+"\n\n看起来，这是你与这位用户的第一次见面。如果用户没有要求你做事，可以先先跟用户寒暄一下，收集并记录这台电脑的信息，用 powershell 查询一下 CPU、GPU、内存、硬盘分区和总容量、用户名等信息，然后用 NAVI_Shell 代码块记住这些信息。"}]
+            return [{"role":"system","content":system_prompt+"\n\n看起来，这是你与这位用户的第一次见面。如果用户没有要求你做事，可以先先跟用户寒暄一下，收集并记录这台电脑的信息，用 powershell 查询一下 CPU、GPU、内存、硬盘分区和总容量、用户名等信息（注意要输出这些信息），然后用 NAVI_Shell 代码块记住这些信息。"}]
     return [{"role":"system","content":system_prompt+"\n\n目前 memory.json 中相关已知的记忆信息：\n\n"+"\n".join(memory_list)}]
 
 def write_log(log):
@@ -801,10 +801,6 @@ def user_input(message=""):
     waiting_input = False
 
     global messages
-
-    # 如果没有记忆，说明是首次使用，清除 example_messages，提示 AI 收集相关信息
-    if memory().read() == []:
-        messages = []
 
     # 写入历史记录
     messages.append({"role": "user", "content": message})
@@ -1106,6 +1102,12 @@ if __name__ == '__main__':
     if " ".join(sys.argv):
         write_log('Start with user input: '+" ".join(sys.argv))
         user_input(" ".join(sys.argv))
+
+    # 如果是无记忆（首次启动），就先执行一轮
+    if memory().read() == []:
+        messages = []
+        user_input()
+        messages = messages + example_messages()*example_mode
 
     # 主循环
     while True:
