@@ -30,6 +30,7 @@ class memory():
         except:
             # 如果失败，返回空列表
             print('\033[31m读取记忆文件失败！请尝试修复或删除 appdata/NAVI/memory.json\033[0m')
+            write_log('Error: Failed to read memory.')
             memories = {'memory': []}
         # 读取记忆文件中的记忆
         memories = memories['memory']
@@ -83,6 +84,7 @@ class memory():
             with open(memory_file_path, 'r',encoding='utf-8-sig') as memory_file:
                 memories = json.load(memory_file)
         except:
+            write_log('Error: Failed to read memory.')
             print('\033[31m读取记忆文件失败！请尝试修复或删除 appdata/NAVI/memory.json\033[0m')
             memories = {'memory': []}
         # 检查是否有相同的记忆
@@ -106,6 +108,7 @@ class memory():
         with open(memory_file_path, 'w',encoding='utf-8-sig') as memory_file:
             # 以UTF8编码写入
             json.dump({'memory': memories}, memory_file, ensure_ascii=False)
+            write_log('Memory added: ' + str({"index": index, "content": content, "tags": tags}))
         return f'Successfull added memory: #{index} {content}'
     
     # 删除记忆
@@ -548,6 +551,7 @@ Assistant: 好的，以后可以优先使用 Winget 安装软件了。'''},
     if new_memory == None:
         return 'No Memory added.'
     else:
+        print("\033[34m<<<<< Adding memory: " + new_memory_content[:32] + "...\033[0m")
         return(memory().add(new_memory_content,new_memory_tags))
     
 
@@ -609,13 +613,13 @@ def system_prompt_messages():
 
     # 从 SystemPrompt.md 中读取 SystemPrompt
     with open('SystemPrompt.md', 'r', encoding='utf-8-sig') as f:
-        system_prompt = f'''当前时间：{now_time()}
+        system_prompt = f'''{f.read()}
+        
+        当前时间：{now_time()}
         
         用户昵称：`{user_name}`
         
-        当前运行路径：`{running_path}\\`
-        
-        {f.read()}'''
+        当前运行路径：`{running_path}\\`'''
     
     # 读取memory并返回
     memory_list = memory().read(messages[-8:])
@@ -731,9 +735,13 @@ def fix_response(content):
     return content
 
 def url_to_markdown(url):
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+    }
     try:
         # 获取HTML内容
-        response = requests.get(url)
+        response = requests.get(url,headers=headers)
         response.raise_for_status()
         html_content = response.text
 
@@ -756,16 +764,17 @@ def url_to_markdown(url):
         if result.returncode == 0:
             markdown_output = result.stdout 
             if markdown_output.count(' ')+markdown_output.count('\n')==len(result.stdout):
+                write_log("Error: Successful load the web page, but failed to read the content.")
                 return 'Successful load the web page, but failed to read the content.'
             markdown_output = markdown_output.replace('没有与此相关的结果','没有与此相关的结果(可能是由于所在IP被封禁，请尝试更换IP或搜索引擎)')
             markdown_output = markdown_output.replace('沒有任何結果適用於','沒有任何結果適用於(可能是由于所在IP被封禁，请尝试更换IP或搜索引擎):')
             markdown_output = markdown_output.replace('There are no results for','There are no results for (可能是由于所在IP被封禁，请尝试更换IP或搜索引擎):')
             return markdown_output
         else:
-            print("Read webpage Error:", result.stderr)
+            write_log("Read webpage Error:", result.stderr)
             return "Read webpage Error:", result.stderr
     except requests.exceptions.RequestException:
-        print(f"Error fetching URL: {url}. This may be caused by website bans or incorrect URL.")
+        write_log(f"Error fetching URL: {url}. This may be caused by website bans or incorrect URL.")
         return f"Error fetching URL: {url}. This may be caused by website bans or incorrect URL."
 
 def navi_shell(shell):
