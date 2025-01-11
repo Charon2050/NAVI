@@ -736,6 +736,25 @@ def fix_response(content):
 
 def url_to_markdown(url):
 
+    def element_in_html(html,tag):
+        i = html.find(tag)
+        stack = [tag.split(' ')[0]]
+
+        while len(stack) != 0 and i < len(html):
+            match = re.search(r'<[\s\S]*?>',html[i:],re.DOTALL)
+            if match:
+                if match.group()[:2] == '</' :
+                    while stack.pop() != match.group().split(' ')[0][2:-1]:
+                        pass
+                elif match.group()[:2] == '<!' or match.group()[-2:] == '/>' :
+                    pass
+                else:
+                    stack.append(match.group().split(' ')[0][1:].replace('>','').replace('\n',''))
+                i += match.end()
+            else:
+                return html[html.find(tag)-1:]
+        return html[html.find(tag)-1:i]
+
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
     }
@@ -745,16 +764,51 @@ def url_to_markdown(url):
         response.raise_for_status()
         html_content = response.text
 
+        '''
         if html_content.find('</head>') != -1:
             html_content = html_content[html_content.find('</head>')+7:]
         if html_content.find('<footer>') != -1:
             html_content = html_content[:html_content.find('<footer>')]
         html_content = re.sub(r'<nav.*?</nav>', '', html_content, flags=re.DOTALL)
         html_content = re.sub(r'[A-Za-z0-9_-]{256,}', '...', html_content,)
+        '''
+
+        website_rule = {
+            'www.bing.com/search':{
+                'body':'ol id="b_results"',
+                'include':['p','h1','h2','h3']
+            },
+            'baike.baidu.com/item':{
+                'body':'div class="contentTab',
+                'include':['p','h1','h2','h3','span']
+            },
+            'search.bilibili.com':{
+                'body':'div class="video i_wrapper search-all-list"',
+                'include':['p','h1','h2','h3','a']
+            },
+            'www.bilibili.com/video':{
+                'body':'div class="div class="left-container',
+                'include':['p','h1','h2','h3','a']
+            },
+        }
+
+        if url.startswith('https://'):
+            url = url[8:]
+        elif url.startswith('http://'):
+            url = url[7:]
+
+        arguments = ''
+        for i in list(website_rule):
+            if url.startswith(i):
+                html_content = element_in_html(html_content,website_rule[i]['body'])
+                arguments += ' --include-selector="' + '" --include-selector="'.join(website_rule[i]['include']) + '"'
+                break
+        if arguments == '':
+            arguments = ' --include-selector="p" --include-selector="h1" --include-selector="h2" --include-selector="h3"'
 
         # 调用html2markdown工具转换HTML为Markdown
         result = subprocess.run(
-            'html2markdown --include-selector="p" --include-selector="h1" --include-selector="h2" --include-selector="h3" --include-selector="h4"', 
+            r'D:\NAVI\tools\html2markdown' + arguments, 
             input=html_content, 
             text=True, 
             capture_output=True,
