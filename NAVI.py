@@ -785,7 +785,7 @@ def navi_shell(shell):
         return(manual_add_memory(shell[9:]))
 
     elif shell[:7]=="forget ":
-        return(memory().delete(shell[7:]))
+        return(memory().delete(int(shell[7:])))
     
     elif shell[:4]=="web ":
         return(url_to_markdown(shell[4:]))
