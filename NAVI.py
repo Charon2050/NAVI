@@ -790,6 +790,10 @@ def url_to_markdown(url):
                 'body':'div class="div class="left-container',
                 'include':['p','h1','h2','h3','a']
             },
+            'music.163.com/api/search/get/web':{
+                'body':'body',
+                'include':[]
+            },
         }
 
         if url.startswith('https://'):
@@ -797,18 +801,19 @@ def url_to_markdown(url):
         elif url.startswith('http://'):
             url = url[7:]
 
-        arguments = ''
         for i in list(website_rule):
             if url.startswith(i):
                 html_content = element_in_html(html_content,website_rule[i]['body'])
-                arguments += ' --include-selector="' + '" --include-selector="'.join(website_rule[i]['include']) + '"'
+                if website_rule[i]['include'] != []:
+                    arguments = ' --include-selector="' + '" --include-selector="'.join(website_rule[i]['include']) + '"'
+                else:
+                    arguments = ''
                 break
-        if arguments == '':
             arguments = ' --include-selector="p" --include-selector="h1" --include-selector="h2" --include-selector="h3"'
 
         # 调用html2markdown工具转换HTML为Markdown
         result = subprocess.run(
-            r'D:\NAVI\tools\html2markdown' + arguments, 
+            r'html2markdown' + arguments, 
             input=html_content, 
             text=True, 
             capture_output=True,
