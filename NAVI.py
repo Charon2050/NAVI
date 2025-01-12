@@ -738,9 +738,12 @@ def url_to_markdown(url):
 
     def element_in_html(html,tag):
         i = html.find(tag)
+        if i == -1: # 如果没有要找的标签，则原样返回
+            return html
         stack = [tag.split(' ')[0]]
 
         while len(stack) != 0 and i < len(html):
+            # 此处有个bug：会错误匹配到脚本等处的 < 符号，即使不是标签
             match = re.search(r'<[\s\S]*?>',html[i:],re.DOTALL)
             if match:
                 if match.group()[:2] == '</' :
@@ -763,6 +766,13 @@ def url_to_markdown(url):
         response = requests.get(url,headers=headers)
         response.raise_for_status()
         html_content = response.text
+        try: # 有些页面返回的是JSON而不是HTML
+            if len(str(json.loads(html_content))) <= 2048:
+                return str(json.loads(html_content))
+            else:
+                return str(json.loads(html_content))[:2044]+'...'
+        except:
+            pass
 
         '''
         if html_content.find('</head>') != -1:
@@ -789,10 +799,6 @@ def url_to_markdown(url):
             'www.bilibili.com/video':{
                 'body':'div class="div class="left-container',
                 'include':['p','h1','h2','h3','a']
-            },
-            'music.163.com/api/search/get/web':{
-                'body':'body',
-                'include':[]
             },
         }
 
@@ -828,7 +834,10 @@ def url_to_markdown(url):
             markdown_output = markdown_output.replace('没有与此相关的结果','没有与此相关的结果(可能是由于所在IP被封禁，请尝试更换IP或搜索引擎)')
             markdown_output = markdown_output.replace('沒有任何結果適用於','沒有任何結果適用於(可能是由于所在IP被封禁，请尝试更换IP或搜索引擎):')
             markdown_output = markdown_output.replace('There are no results for','There are no results for (可能是由于所在IP被封禁，请尝试更换IP或搜索引擎):')
-            return markdown_output
+            if len(markdown_output) <= 2048:
+                return markdown_output
+            else:
+                return markdown_output[:2044]+'...'
         else:
             write_log("Read webpage Error:", result.stderr)
             return "Read webpage Error:", result.stderr
@@ -861,8 +870,8 @@ def navi_shell(shell):
                 # 删除连续3个以上的空白字符
                 i[2] = re.sub(r'(\s)\1{3,}', r'\1\1', i[2])
                 # 缩减过长输出
-                if len(i[2]) > 1024:
-                    i[2] = i[2][:512]+"\n......\n" + i[2][-512:]
+                if len(i[2]) > 2048:
+                    i[2] = i[2][:1024]+"\n......\n" + i[2][-1024:]
                 temp.append(f'INFO: A process started at {i[1]} is still running with following content: \n' + i[2])
         return "\n".join(temp)+'\nINFO: No other process running. Do not repeatedly run this command.'
     
