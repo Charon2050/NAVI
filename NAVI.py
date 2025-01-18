@@ -551,7 +551,8 @@ Assistant: 好的，以后可以优先使用 Winget 安装软件了。'''},
     if new_memory == None:
         return 'No Memory added.'
     else:
-        print("\033[34m<<<<< Adding memory: " + new_memory_content[:32] + "...\033[0m")
+        if not hide_shell_output:
+            print("\033[34m<<<<< Adding memory: " + new_memory_content[:32] + "...\033[0m")
         return(memory().add(new_memory_content,new_memory_tags))
     
 
