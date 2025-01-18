@@ -412,7 +412,7 @@ def check_completed_processes():
         if completed_processes:
             write_log('\n'.join(completed_processes))
             # 输出消息之前，先换一行，防止和 'USER: ' 输入提示放在同一行
-            print('')
+            print('\r',end='')
             # 输出系统消息
             if hide_shell_output :
                 0
