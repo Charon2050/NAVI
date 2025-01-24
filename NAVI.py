@@ -369,7 +369,7 @@ def check_completed_processes():
             # 此处参考 https://blog.csdn.net/KiteRunner/article/details/129848482
             # 若进程仍在运行
             if running_processes[i][0].poll() is None:
-                # 获取handle
+                # 获取 stdout handle
                 handle = msvcrt.get_osfhandle(running_processes[i][0].stdout.fileno())
                 # 若有输出
                 try: # 下面这行执行时，有小概率报错「管道已结束」
@@ -382,6 +382,24 @@ def check_completed_processes():
                         except UnicodeDecodeError:
                             # 否则报错
                             running_processes[i][2] = "Error: Processes finished, but failed to read the output. It may caused by incorrect file encoding / decoding."
+                            # 已经编码错误了就别试了
+                            running_processes[i][0].kill()
+                except BrokenPipeError:
+                    pass
+                # 获取 stderr handle
+                handle = msvcrt.get_osfhandle(running_processes[i][0].stderr.fileno())
+                # 若有输出
+                try:
+                    if _winapi.PeekNamedPipe(handle, 0)[0] > 0:
+                        running_processes[i][2] = running_processes[i][2] + '\n\n'
+                        # 读取输出
+                        data= _winapi.ReadFile(handle, _winapi.PeekNamedPipe(handle, 0)[0])[0]
+                        try:
+                            # 尝试解码
+                            running_processes[i][2] = running_processes[i][2] + auto_decode(data) # 输出是自带换行的
+                        except UnicodeDecodeError:
+                            # 否则报错
+                            running_processes[i][2] = "Error: Processes finished, but failed to read the error output. It may caused by incorrect file encoding / decoding."
                             # 已经编码错误了就别试了
                             running_processes[i][0].kill()
                 except BrokenPipeError:
