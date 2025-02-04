@@ -9,7 +9,7 @@
 
 0. 请准备一个对话大语言模型的 API Key。推荐前往 [DeepSeek 开放平台](https://platform.deepseek.com/api_keys) 获取。
 
-1. [下载本程序](https://github.com/Charon2050/NAVI/releases/download/v0.2/NAVI_Windows.zip)。
+1. [下载本程序](https://github.com/Charon2050/NAVI/releases/download/v0.5/NAVI_Windows.zip)。
 
 2. 解压本程序。
 
