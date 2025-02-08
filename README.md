@@ -57,6 +57,7 @@
 # 自定义 API 提供商的 base url，应当兼容 OpenAI 格式调用。命令行调用时，使用 -url xxx 参数临时设置此项
 'model': 'deepseek-chat',
 # 自定义 API 提供商的模型编码，建议选用代码能力强大的模型。命令行调用时，使用 -model xxx 参数临时设置此项
+# 注：DeepSeek R1 等推理模型会导致响应速度缓慢，因此不建议使用。
 'api_key': 'xxxxxxxxxxxxx',
 # 自定义 API Key命令行调用时，使用 -key xxx 参数临时设置此项
 'user_name': "USER",
