@@ -777,6 +777,25 @@ def url_to_markdown(url):
                 return html[html.find(tag)-1:]
         return html[html.find(tag)-1:i]
 
+    website_rule = {
+        'www.bing.com/search':{
+            'body':'ol id="b_results"',
+            'include':['p','h1','h2','h3']
+        },
+        'baike.baidu.com/item':{
+            'body':'div class="contentTab',
+            'include':['p','h1','h2','h3','span']
+        },
+        'search.bilibili.com':{
+            'body':'div class="video i_wrapper search-all-list"',
+            'include':['p','h1','h2','h3','a']
+        },
+        'www.bilibili.com/video':{
+            'body':'div class="div class="left-container',
+            'include':['p','h1','h2','h3','a']
+        },
+    }
+    
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
     }
@@ -792,34 +811,6 @@ def url_to_markdown(url):
                 return str(json.loads(html_content))[:2044]+'...'
         except:
             pass
-
-        '''
-        if html_content.find('</head>') != -1:
-            html_content = html_content[html_content.find('</head>')+7:]
-        if html_content.find('<footer>') != -1:
-            html_content = html_content[:html_content.find('<footer>')]
-        html_content = re.sub(r'<nav.*?</nav>', '', html_content, flags=re.DOTALL)
-        html_content = re.sub(r'[A-Za-z0-9_-]{256,}', '...', html_content,)
-        '''
-
-        website_rule = {
-            'www.bing.com/search':{
-                'body':'ol id="b_results"',
-                'include':['p','h1','h2','h3']
-            },
-            'baike.baidu.com/item':{
-                'body':'div class="contentTab',
-                'include':['p','h1','h2','h3','span']
-            },
-            'search.bilibili.com':{
-                'body':'div class="video i_wrapper search-all-list"',
-                'include':['p','h1','h2','h3','a']
-            },
-            'www.bilibili.com/video':{
-                'body':'div class="div class="left-container',
-                'include':['p','h1','h2','h3','a']
-            },
-        }
 
         if url.startswith('https://'):
             url = url[8:]
