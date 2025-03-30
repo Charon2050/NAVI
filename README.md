@@ -1,5 +1,7 @@
 # NAVI
 
+> 2025-03-30 update: MCP 已成为事实标准，本项目暂且停更
+
 允许对话模型直接执行代码 / 命令，实现 AI 操作电脑。
 
 <img src="./screenshots/screenshot1.png" width="700" />
